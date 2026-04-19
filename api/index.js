@@ -22,7 +22,7 @@ async function init() {
   if (initPromise) return initPromise;
   initPromise = (async () => {
     const db = getDb();
-    const statements = [
+    await db.batch([
       `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT, username TEXT UNIQUE, password TEXT, role TEXT, isAdmin INTEGER DEFAULT 0)`,
       `CREATE TABLE IF NOT EXISTS invoiceItems (id TEXT PRIMARY KEY, product TEXT, originalName TEXT, matched INTEGER DEFAULT 0, quantity REAL, unit TEXT, unitPrice REAL, totalPrice REAL, category TEXT, supplier TEXT, date TEXT, isoDate TEXT, processedAt TEXT)`,
       `CREATE TABLE IF NOT EXISTS catalog (id TEXT PRIMARY KEY, name TEXT, category TEXT)`,
@@ -30,15 +30,16 @@ async function init() {
       `CREATE TABLE IF NOT EXISTS clTemplates (id TEXT PRIMARY KEY, title TEXT, category TEXT, items TEXT, createdAt TEXT)`,
       `CREATE TABLE IF NOT EXISTS clCompletions (id TEXT PRIMARY KEY, templateId TEXT, templateTitle TEXT, category TEXT, userId TEXT, userName TEXT, date TEXT, time TEXT, timestamp INTEGER, items TEXT, expiresAt TEXT)`,
       `CREATE TABLE IF NOT EXISTS reminders (id TEXT PRIMARY KEY, text TEXT, authorId TEXT, authorName TEXT, createdAt TEXT, timestamp INTEGER)`,
-    ];
-    for (const s of statements) await db.execute(s);
-    const r = await db.execute("SELECT COUNT(*) as c FROM users");
-    if (Number(r.rows[0].c) === 0) {
-      await db.execute({
-        sql: "INSERT INTO users (id, name, username, password, role, isAdmin) VALUES (?, ?, ?, ?, ?, ?)",
-        args: ["admin", "Administrador", "admin", "admin", "Gerente", 1],
-      });
-    }
+      `CREATE TABLE IF NOT EXISTS productionItems (id TEXT PRIMARY KEY, name TEXT, unit TEXT, minQty REAL DEFAULT 0, qty REAL, cycleKey TEXT, sortOrder INTEGER DEFAULT 0)`,
+      `CREATE TABLE IF NOT EXISTS productionCycle (id INTEGER PRIMARY KEY CHECK (id = 1), cycleKey TEXT, concludedAt TEXT)`,
+      `INSERT OR IGNORE INTO productionCycle (id, cycleKey, concludedAt) VALUES (1, NULL, NULL)`,
+      `CREATE INDEX IF NOT EXISTS idx_items_isodate ON invoiceItems(isoDate DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_punches_timestamp ON punches(timestamp DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_clcompletions_timestamp ON clCompletions(timestamp DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_reminders_timestamp ON reminders(timestamp DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_production_sort ON productionItems(sortOrder ASC, name ASC)`,
+      `INSERT OR IGNORE INTO users (id, name, username, password, role, isAdmin) VALUES ('admin', 'Administrador', 'admin', 'admin', 'Gerente', 1)`,
+    ]);
   })();
   return initPromise;
 }
@@ -155,6 +156,74 @@ app.post("/api/reminders", async (req, res) => {
   res.json({ ok: true });
 });
 app.delete("/api/reminders/:id", async (req, res) => { await exec("DELETE FROM reminders WHERE id=?", [req.params.id]); res.json({ ok: true }); });
+
+// ── Production ──
+app.get("/api/production/items", async (_, res) => {
+  const r = await exec("SELECT * FROM productionItems ORDER BY sortOrder ASC, name ASC");
+  res.json(r.rows);
+});
+app.post("/api/production/items", async (req, res) => {
+  const { id, name, unit, minQty, sortOrder } = req.body;
+  await exec("INSERT INTO productionItems (id, name, unit, minQty, qty, cycleKey, sortOrder) VALUES (?,?,?,?,NULL,NULL,?)",
+    [id, name, unit || "und", Number(minQty) || 0, Number(sortOrder) || 0]);
+  res.json({ ok: true });
+});
+app.put("/api/production/items/:id", async (req, res) => {
+  const { name, unit, minQty, qty, cycleKey, sortOrder } = req.body;
+  const fields = [];
+  const args = [];
+  if (name !== undefined) { fields.push("name=?"); args.push(name); }
+  if (unit !== undefined) { fields.push("unit=?"); args.push(unit); }
+  if (minQty !== undefined) { fields.push("minQty=?"); args.push(Number(minQty) || 0); }
+  if (qty !== undefined) { fields.push("qty=?"); args.push(qty === null ? null : Number(qty)); }
+  if (cycleKey !== undefined) { fields.push("cycleKey=?"); args.push(cycleKey); }
+  if (sortOrder !== undefined) { fields.push("sortOrder=?"); args.push(Number(sortOrder) || 0); }
+  if (!fields.length) return res.json({ ok: true });
+  args.push(req.params.id);
+  await exec(`UPDATE productionItems SET ${fields.join(", ")} WHERE id=?`, args);
+  res.json({ ok: true });
+});
+app.delete("/api/production/items/:id", async (req, res) => {
+  await exec("DELETE FROM productionItems WHERE id=?", [req.params.id]);
+  res.json({ ok: true });
+});
+app.get("/api/production/cycle", async (_, res) => {
+  const r = await exec("SELECT * FROM productionCycle WHERE id=1");
+  res.json(r.rows[0] || { id: 1, cycleKey: null, concludedAt: null });
+});
+app.put("/api/production/cycle", async (req, res) => {
+  const { cycleKey, concludedAt } = req.body;
+  await exec("UPDATE productionCycle SET cycleKey=?, concludedAt=? WHERE id=1",
+    [cycleKey ?? null, concludedAt ?? null]);
+  res.json({ ok: true });
+});
+
+// ── Bootstrap: carrega todos os dados iniciais em 1 request ──
+app.get("/api/bootstrap", async (_, res) => {
+  try {
+    const db = getDb();
+    const [u, i, c, t, co, rem, pi, pc] = await db.batch([
+      "SELECT * FROM users",
+      "SELECT * FROM invoiceItems ORDER BY isoDate DESC",
+      "SELECT * FROM catalog",
+      "SELECT * FROM clTemplates",
+      "SELECT * FROM clCompletions ORDER BY timestamp DESC",
+      "SELECT * FROM reminders ORDER BY timestamp DESC",
+      "SELECT * FROM productionItems ORDER BY sortOrder ASC, name ASC",
+      "SELECT * FROM productionCycle WHERE id=1",
+    ], "read");
+    res.json({
+      users: u.rows.map(x => ({ ...x, isAdmin: bool(x.isAdmin) })),
+      items: i.rows.map(x => ({ ...x, matched: bool(x.matched) })),
+      catalog: c.rows,
+      clTemplates: t.rows.map(x => ({ ...x, items: JSON.parse(x.items) })),
+      clCompletions: co.rows.map(x => ({ ...x, items: JSON.parse(x.items) })),
+      reminders: rem.rows,
+      productionItems: pi.rows,
+      productionCycle: pc.rows[0] || { id: 1, cycleKey: null, concludedAt: null },
+    });
+  } catch (err) { res.status(500).json({ error: String(err.message) }); }
+});
 
 // ── Claude API Proxy ──
 app.post("/api/analyze", async (req, res) => {

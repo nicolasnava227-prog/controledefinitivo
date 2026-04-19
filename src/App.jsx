@@ -37,6 +37,21 @@ const DEFAULT_ADMIN = { id: "admin", name: "Administrador", username: "admin", p
 // ═══════════════════════════════════════════════════════════════════════════
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+// Ciclo de produção: abre todo dia às 21h e fecha quando o operador clica "Concluir".
+// Antes das 21h, ainda estamos no ciclo que começou às 21h do dia anterior.
+const PRODUCTION_CYCLE_HOUR = 21;
+function getCurrentCycleKey(now = new Date()) {
+  const d = new Date(now);
+  if (now.getHours() < PRODUCTION_CYCLE_HOUR) d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function getNextCycleStart(now = new Date()) {
+  const d = new Date(now);
+  d.setHours(PRODUCTION_CYCLE_HOUR, 0, 0, 0);
+  if (now.getHours() >= PRODUCTION_CYCLE_HOUR) d.setDate(d.getDate() + 1);
+  return d;
+}
 function formatBRL(v) { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v); }
 function todayISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
 function nowTime() { const d = new Date(); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }
@@ -770,6 +785,249 @@ function ChecklistAnalysis({ completions, users, onPhotoClick }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// PRODUÇÃO
+// ═══════════════════════════════════════════════════════════════════════════
+
+function formatCountdown(ms) {
+  if (ms <= 0) return "0s";
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m`;
+  if (m > 0) return `${m}m ${String(sec).padStart(2, "0")}s`;
+  return `${sec}s`;
+}
+
+function ProductionControlView({ items, cycle, onUpdateItem, onUpdateCycle }) {
+  const [now, setNow] = useState(new Date());
+  const [drafts, setDrafts] = useState({});
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const currentCycleKey = getCurrentCycleKey(now);
+  const nextCycleStart = getNextCycleStart(now);
+  const locked = cycle.cycleKey === currentCycleKey && !!cycle.concludedAt;
+  const cycleTransitioned = cycle.cycleKey && cycle.cycleKey !== currentCycleKey;
+
+  useEffect(() => {
+    if (cycleTransitioned) {
+      onUpdateCycle({ cycleKey: null, concludedAt: null });
+    }
+  }, [cycleTransitioned, onUpdateCycle]);
+
+  const visibleQty = (item) => {
+    if (item.cycleKey !== currentCycleKey) return null;
+    return item.qty;
+  };
+
+  const getDraft = (item) => {
+    if (drafts[item.id] !== undefined) return drafts[item.id];
+    const q = visibleQty(item);
+    return q == null ? "" : String(q);
+  };
+
+  const saveDraft = (item) => {
+    const raw = drafts[item.id];
+    if (raw === undefined) return;
+    const num = raw === "" ? null : Number(raw);
+    const qty = Number.isFinite(num) ? num : null;
+    onUpdateItem(item.id, { qty, cycleKey: qty == null ? null : currentCycleKey });
+    setDrafts(prev => { const { [item.id]: _, ...rest } = prev; return rest; });
+  };
+
+  const sorted = [...items].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name));
+  const allFilled = sorted.length > 0 && sorted.every(i => i.cycleKey === currentCycleKey && i.qty != null);
+  const belowMin = sorted.filter(i => i.cycleKey === currentCycleKey && i.qty != null && i.qty < (i.minQty || 0));
+
+  const concluir = () => {
+    if (!allFilled) return alert("Preencha as quantidades de todos os itens antes de concluir.");
+    onUpdateCycle({ cycleKey: currentCycleKey, concludedAt: new Date().toISOString() });
+  };
+
+  const reabrir = () => {
+    if (!confirm("Reabrir o ciclo para edição?")) return;
+    onUpdateCycle({ cycleKey: currentCycleKey, concludedAt: null });
+  };
+
+  if (sorted.length === 0) {
+    return (
+      <div style={{ textAlign: "center", padding: "60px 20px" }}>
+        <div style={{ fontSize: 44, marginBottom: 12, opacity: 0.2 }}>🏭</div>
+        <p style={{ fontSize: 14, color: "#555" }}>Nenhum item de produção cadastrado ainda.</p>
+        <p style={{ fontSize: 12, color: "#444", marginTop: 6 }}>Um administrador precisa adicionar itens em "Gerenciar itens".</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="anim" style={{ padding: "20px 28px", maxWidth: 720, margin: "0 auto" }}>
+      <div style={{ ...cardStyle, padding: "14px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 12, borderLeft: `3px solid ${locked ? "#6ee7b7" : "#fbbf24"}` }}>
+        <span style={{ fontSize: 18 }}>{locked ? "🔒" : "📝"}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, color: "#ddd", fontWeight: 600 }}>
+            {locked ? "Ciclo concluído" : "Ciclo aberto para edição"}
+          </div>
+          <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>
+            {locked
+              ? `Reabre em ${formatCountdown(nextCycleStart - now)} · próximo ciclo às 21h`
+              : `Registre as quantidades produzidas e clique em "Concluir"`}
+          </div>
+        </div>
+        {locked && (
+          <button onClick={reabrir} style={{ ...actionBtn("#888"), fontSize: 11, padding: "6px 12px" }}>Reabrir</button>
+        )}
+      </div>
+
+      {belowMin.length > 0 && !locked && (
+        <div style={{ ...cardStyle, padding: "10px 14px", marginBottom: 14, borderLeft: "3px solid #ef4444", display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 14 }}>⚠️</span>
+          <span style={{ fontSize: 12, color: "#f87171" }}>{belowMin.length} {belowMin.length === 1 ? "item abaixo" : "itens abaixo"} da quantidade mínima</span>
+        </div>
+      )}
+
+      {sorted.map(item => {
+        const q = visibleQty(item);
+        const filled = q != null;
+        const alert = filled && q < (item.minQty || 0);
+        return (
+          <div key={item.id} style={{ ...cardStyle, marginBottom: 8, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, borderLeft: alert ? "3px solid #ef4444" : "3px solid transparent" }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#ddd" }}>{item.name}</div>
+              <div style={{ fontSize: 11, color: alert ? "#f87171" : "#555", marginTop: 2 }}>
+                {alert ? `⚠️ Abaixo do mínimo (${item.minQty} ${item.unit})` : `Mínimo: ${item.minQty || 0} ${item.unit}`}
+              </div>
+            </div>
+            {locked ? (
+              <div style={{ fontSize: 16, fontWeight: 700, color: alert ? "#f87171" : "#6ee7b7", minWidth: 90, textAlign: "right" }}>
+                {filled ? `${q} ${item.unit}` : "—"}
+              </div>
+            ) : (
+              <>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={getDraft(item)}
+                  onChange={e => setDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                  onBlur={() => saveDraft(item)}
+                  onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                  placeholder="0"
+                  style={{ ...inputBase, width: 90, textAlign: "right", fontSize: 15, fontWeight: 600 }}
+                />
+                <div style={{ fontSize: 12, color: "#666", minWidth: 34 }}>{item.unit}</div>
+              </>
+            )}
+          </div>
+        );
+      })}
+
+      {!locked && (
+        <button
+          onClick={concluir}
+          disabled={!allFilled}
+          style={{
+            width: "100%", marginTop: 16, padding: "12px 20px", borderRadius: 10,
+            border: "1px solid " + (allFilled ? "#6ee7b7" : "#2a2a3a"),
+            background: allFilled ? "#34d39918" : "#13131e",
+            color: allFilled ? "#6ee7b7" : "#555",
+            fontSize: 14, fontWeight: 600, cursor: allFilled ? "pointer" : "not-allowed",
+            fontFamily: "inherit",
+          }}
+        >
+          ✓ Concluir ciclo de hoje
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ProductionManageView({ items, onAdd, onUpdate, onRemove }) {
+  const [form, setForm] = useState({ name: "", unit: "und", minQty: "" });
+  const [editId, setEditId] = useState(null);
+  const [editForm, setEditForm] = useState({ name: "", unit: "und", minQty: "" });
+
+  const sorted = [...items].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name));
+
+  const save = () => {
+    if (!form.name.trim()) return;
+    onAdd({ name: form.name.trim(), unit: form.unit.trim() || "und", minQty: Number(form.minQty) || 0 });
+    setForm({ name: "", unit: "und", minQty: "" });
+  };
+
+  const startEdit = (i) => {
+    setEditId(i.id);
+    setEditForm({ name: i.name, unit: i.unit || "und", minQty: String(i.minQty ?? 0) });
+  };
+
+  const saveEdit = () => {
+    if (!editForm.name.trim()) return;
+    onUpdate(editId, { name: editForm.name.trim(), unit: editForm.unit.trim() || "und", minQty: Number(editForm.minQty) || 0 });
+    setEditId(null);
+  };
+
+  const remove = (id) => {
+    if (!confirm("Remover este item de produção?")) return;
+    onRemove(id);
+  };
+
+  return (
+    <div className="anim" style={{ padding: "20px 28px", maxWidth: 720, margin: "0 auto" }}>
+      <div style={{ ...cardStyle, marginBottom: 20, padding: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 14 }}>Adicionar item de produção</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ flex: "1 1 200px" }}>
+            <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Nome</label>
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Mix de vegetais" style={{ ...inputBase, width: "100%" }} />
+          </div>
+          <div style={{ flex: "0 0 90px" }}>
+            <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Unidade</label>
+            <input value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} placeholder="und" style={{ ...inputBase, width: "100%" }} />
+          </div>
+          <div style={{ flex: "0 0 110px" }}>
+            <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Qtd. mínima</label>
+            <input type="number" value={form.minQty} onChange={e => setForm({ ...form, minQty: e.target.value })} placeholder="0" style={{ ...inputBase, width: "100%" }} />
+          </div>
+          <button onClick={save} style={{ ...actionBtn("#6ee7b7"), fontWeight: 600, padding: "8px 20px" }}>+ Adicionar</button>
+        </div>
+      </div>
+
+      {sorted.length === 0 && (
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <div style={{ fontSize: 36, marginBottom: 10, opacity: 0.2 }}>📋</div>
+          <p style={{ fontSize: 13, color: "#555" }}>Nenhum item cadastrado</p>
+        </div>
+      )}
+
+      {sorted.map(i => (
+        <div key={i.id} style={{ ...cardStyle, marginBottom: 8, padding: "12px 16px" }}>
+          {editId === i.id ? (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} style={{ ...inputBase, flex: "1 1 180px" }} />
+              <input value={editForm.unit} onChange={e => setEditForm({ ...editForm, unit: e.target.value })} style={{ ...inputBase, width: 70 }} />
+              <input type="number" value={editForm.minQty} onChange={e => setEditForm({ ...editForm, minQty: e.target.value })} style={{ ...inputBase, width: 90 }} />
+              <button onClick={saveEdit} style={{ ...actionBtn("#6ee7b7"), fontSize: 11, padding: "6px 12px" }}>Salvar</button>
+              <button onClick={() => setEditId(null)} style={{ ...actionBtn("#888"), fontSize: 11, padding: "6px 12px" }}>Cancelar</button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#ddd" }}>{i.name}</div>
+                <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>Mínimo: {i.minQty || 0} {i.unit}</div>
+              </div>
+              <button onClick={() => startEdit(i)} style={{ ...actionBtn("#38bdf8"), fontSize: 11, padding: "6px 12px" }}>Editar</button>
+              <button onClick={() => remove(i.id)} style={{ ...actionBtn("#ef4444"), fontSize: 11, padding: "6px 12px" }}>Remover</button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -783,6 +1041,11 @@ export default function App() {
   const [section, setSection] = useState("compras");
   const [comprasTab, setComprasTab] = useState("notas");
   const [checkTab, setCheckTab] = useState("fazer");
+  const [producaoTab, setProducaoTab] = useState("controle");
+
+  // Production
+  const [prodItems, setProdItems] = useState([]);
+  const [prodCycle, setProdCycle] = useState({ cycleKey: null, concludedAt: null });
 
   // Invoice data
   const [items, setItems] = useState([]);
@@ -820,20 +1083,19 @@ export default function App() {
   // handleDrop hook before early return
   const handleDrop = useCallback(e => { e.preventDefault(); setDragOver(false); }, []);
 
-  // ── Load all data from backend ──
+  // ── Load all data from backend (1 request) ──
   useEffect(() => {
     if (!currentUser) return;
-    Promise.all([
-      fetch("/api/users").then(r => r.json()),
-      fetch("/api/items").then(r => r.json()),
-      fetch("/api/catalog").then(r => r.json()),
-      fetch("/api/cl-templates").then(r => r.json()),
-      fetch("/api/cl-completions").then(r => r.json()),
-      fetch("/api/reminders").then(r => r.json()),
-    ]).then(([u, i, c, t, co, rem]) => {
-      setUsers(u); setItems(i); setCatalog(c); setClTemplates(t); setClCompletions(co);
-      setReminders(rem);
-      if (rem.length > 0) setShowReminders(true);
+    fetch("/api/bootstrap").then(r => r.json()).then(d => {
+      setUsers(d.users || []);
+      setItems(d.items || []);
+      setCatalog(d.catalog || []);
+      setClTemplates(d.clTemplates || []);
+      setClCompletions(d.clCompletions || []);
+      setReminders(d.reminders || []);
+      setProdItems(d.productionItems || []);
+      setProdCycle(d.productionCycle || { cycleKey: null, concludedAt: null });
+      if ((d.reminders || []).length > 0) setShowReminders(true);
       setDataLoaded(true);
     }).catch(err => console.error("Erro ao carregar dados:", err));
   }, [currentUser]);
@@ -860,6 +1122,23 @@ export default function App() {
     if (currentUser && section === "checklists") refreshChecklists();
   }, [section, checkTab, currentUser, refreshChecklists]);
 
+  // ── Production: sync ──
+  const refreshProduction = useCallback(() => {
+    Promise.all([
+      fetch("/api/production/items").then(r => r.json()),
+      fetch("/api/production/cycle").then(r => r.json()),
+    ]).then(([pi, pc]) => {
+      setProdItems(pi || []);
+      setProdCycle(pc || { cycleKey: null, concludedAt: null });
+    }).catch(() => { });
+  }, []);
+  useEffect(() => {
+    if (!currentUser || section !== "producao") return;
+    refreshProduction();
+    const t = setInterval(refreshProduction, 15000);
+    return () => clearInterval(t);
+  }, [currentUser, section, refreshProduction]);
+
   // ── LOGIN ──
   if (!currentUser) return <LoginScreen onLogin={setCurrentUser} />;
 
@@ -885,6 +1164,26 @@ export default function App() {
 
   // Checklist Completions
   const addClCompletion = (comp) => { setClCompletions(prev => [...prev, comp]); api("/api/cl-completions", { method: "POST", body: JSON.stringify(comp) }); };
+
+  // Production
+  const addProdItem = async (data) => {
+    const item = { id: uid(), name: data.name, unit: data.unit || "und", minQty: Number(data.minQty) || 0, sortOrder: prodItems.length };
+    setProdItems(prev => [...prev, { ...item, qty: null, cycleKey: null }]);
+    await api("/api/production/items", { method: "POST", body: JSON.stringify(item) });
+  };
+  const updateProdItem = async (id, patch) => {
+    setProdItems(prev => prev.map(i => i.id === id ? { ...i, ...patch } : i));
+    await api(`/api/production/items/${id}`, { method: "PUT", body: JSON.stringify(patch) });
+  };
+  const removeProdItem = async (id) => {
+    setProdItems(prev => prev.filter(i => i.id !== id));
+    await api(`/api/production/items/${id}`, { method: "DELETE" });
+  };
+  const updateProdCycle = async (patch) => {
+    const next = { ...prodCycle, ...patch };
+    setProdCycle(next);
+    await api("/api/production/cycle", { method: "PUT", body: JSON.stringify(next) });
+  };
 
   // Reminders
   const addReminder = (text) => {
@@ -1010,6 +1309,7 @@ export default function App() {
           <div style={{ display: "flex" }}>
             {isAdmin && <button onClick={() => setSection("compras")} style={mainTab(section === "compras")}>🧾 Compras</button>}
             <button onClick={() => setSection("checklists")} style={mainTab(section === "checklists")}>📋 Check-Lists</button>
+            <button onClick={() => setSection("producao")} style={mainTab(section === "producao")}>🏭 Produção</button>
             <button onClick={() => setSection("funcionarios")} style={mainTab(section === "funcionarios")}>👥 Funcionários</button>
           </div>
         </div>
@@ -1030,6 +1330,12 @@ export default function App() {
         {section === "funcionarios" && isAdmin && (
           <>
             <button style={subTab(true)}>Equipe ({users.length})</button>
+          </>
+        )}
+        {section === "producao" && (
+          <>
+            <button onClick={() => setProducaoTab("controle")} style={subTab(producaoTab === "controle")}>Controle</button>
+            {isAdmin && <button onClick={() => setProducaoTab("gerenciar")} style={subTab(producaoTab === "gerenciar")}>Gerenciar itens ({prodItems.length})</button>}
           </>
         )}
         {section === "checklists" && (
@@ -1200,7 +1506,11 @@ export default function App() {
         </>
       )}
 
-      {/* TAB: FUNCIONÁRIOS */}
+      {/* TAB: PRODUÇÃO */}
+      {section === "producao" && producaoTab === "controle" && <ProductionControlView items={prodItems} cycle={prodCycle} onUpdateItem={updateProdItem} onUpdateCycle={updateProdCycle} />}
+      {section === "producao" && producaoTab === "gerenciar" && isAdmin && <ProductionManageView items={prodItems} onAdd={addProdItem} onUpdate={updateProdItem} onRemove={removeProdItem} />}
+      {section === "producao" && producaoTab === "gerenciar" && !isAdmin && (<div style={{ textAlign: "center", padding: "60px 20px" }}><div style={{ fontSize: 44, marginBottom: 12, opacity: 0.2 }}>🔒</div><p style={{ fontSize: 14, color: "#555" }}>Área restrita para administradores</p></div>)}
+
       {/* TAB: FUNCIONÁRIOS */}
       {section === "funcionarios" && isAdmin && <EmployeeManager users={users} onAdd={addUser} onUpdate={updateUser} onRemove={removeUser} />}
       {section === "funcionarios" && !isAdmin && (<div style={{ textAlign: "center", padding: "60px 20px" }}><div style={{ fontSize: 44, marginBottom: 12, opacity: 0.2 }}>🔒</div><p style={{ fontSize: 14, color: "#555" }}>Área restrita para administradores</p></div>)}
