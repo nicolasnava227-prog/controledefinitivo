@@ -52,6 +52,11 @@ app.use(async (req, res, next) => {
 
 const exec = (sql, args = []) => getDb().execute({ sql, args });
 const bool = v => !!(typeof v === "bigint" ? Number(v) : v);
+// Remove fotos (base64 pesado) dos items, mantendo só contagem — usado em listagens
+const stripPhotos = items => (items || []).map(it => ({
+  text: it.text,
+  photoCount: (it.photos || []).length + (it.photo ? 1 : 0),
+}));
 
 // ── Auth ──
 app.post("/api/login", async (req, res) => {
@@ -134,8 +139,8 @@ app.delete("/api/cl-templates/:id", async (req, res) => { await exec("DELETE FRO
 
 // ── Checklist Completions ──
 app.get("/api/cl-completions", async (_, res) => {
-  const r = await exec("SELECT * FROM clCompletions ORDER BY timestamp DESC");
-  res.json(r.rows.map(c => ({ ...c, items: JSON.parse(c.items) })));
+  const r = await exec("SELECT id, templateId, templateTitle, category, userId, userName, date, time, timestamp, items, expiresAt FROM clCompletions ORDER BY timestamp DESC");
+  res.json(r.rows.map(c => ({ ...c, items: stripPhotos(JSON.parse(c.items)) })));
 });
 app.post("/api/cl-completions", async (req, res) => {
   const c = req.body;
@@ -198,7 +203,7 @@ app.put("/api/production/cycle", async (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Bootstrap: carrega todos os dados iniciais em 1 request ──
+// ── Bootstrap: carrega todos os dados iniciais em 1 request (sem fotos dos checklists) ──
 app.get("/api/bootstrap", async (_, res) => {
   try {
     const db = getDb();
@@ -207,7 +212,7 @@ app.get("/api/bootstrap", async (_, res) => {
       "SELECT * FROM invoiceItems ORDER BY isoDate DESC",
       "SELECT * FROM catalog",
       "SELECT * FROM clTemplates",
-      "SELECT * FROM clCompletions ORDER BY timestamp DESC",
+      "SELECT id, templateId, templateTitle, category, userId, userName, date, time, timestamp, items, expiresAt FROM clCompletions ORDER BY timestamp DESC",
       "SELECT * FROM reminders ORDER BY timestamp DESC",
       "SELECT * FROM productionItems ORDER BY sortOrder ASC, name ASC",
       "SELECT * FROM productionCycle WHERE id=1",
@@ -217,11 +222,21 @@ app.get("/api/bootstrap", async (_, res) => {
       items: i.rows.map(x => ({ ...x, matched: bool(x.matched) })),
       catalog: c.rows,
       clTemplates: t.rows.map(x => ({ ...x, items: JSON.parse(x.items) })),
-      clCompletions: co.rows.map(x => ({ ...x, items: JSON.parse(x.items) })),
+      clCompletions: co.rows.map(x => ({ ...x, items: stripPhotos(JSON.parse(x.items)) })),
       reminders: rem.rows,
       productionItems: pi.rows,
       productionCycle: pc.rows[0] || { id: 1, cycleKey: null, concludedAt: null },
     });
+  } catch (err) { res.status(500).json({ error: String(err.message) }); }
+});
+
+// ── Single checklist completion com fotos (lazy-load ao expandir na análise) ──
+app.get("/api/cl-completions/:id", async (req, res) => {
+  try {
+    const r = await exec("SELECT * FROM clCompletions WHERE id=?", [req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ error: "Não encontrado" });
+    const c = r.rows[0];
+    res.json({ ...c, items: JSON.parse(c.items) });
   } catch (err) { res.status(500).json({ error: String(err.message) }); }
 });
 

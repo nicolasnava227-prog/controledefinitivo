@@ -669,6 +669,25 @@ function ChecklistAnalysis({ completions, users, onPhotoClick }) {
   const [filterUser, setFilterUser] = useState("all");
   const [filterCat, setFilterCat] = useState("all");
   const [expandedId, setExpandedId] = useState(null);
+  const [detailCache, setDetailCache] = useState({}); // { [id]: items[] with photos }
+  const [loadingId, setLoadingId] = useState(null);
+
+  const toggleExpand = async (c) => {
+    if (expandedId === c.id) { setExpandedId(null); return; }
+    setExpandedId(c.id);
+    if (detailCache[c.id]) return;
+    const hasPhotos = c.items.some(it => (it.photoCount || 0) > 0);
+    if (!hasPhotos) return;
+    setLoadingId(c.id);
+    try {
+      const r = await fetch(`/api/cl-completions/${c.id}`);
+      if (r.ok) {
+        const full = await r.json();
+        setDetailCache(prev => ({ ...prev, [c.id]: full.items }));
+      }
+    } catch { }
+    finally { setLoadingId(null); }
+  };
 
   const today = todayISO();
   const sevenDaysAgo = (() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); })();
@@ -754,7 +773,7 @@ function ChecklistAnalysis({ completions, users, onPhotoClick }) {
       {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#333" }}>Nenhum checklist no período selecionado</div>}
       {filtered.map(c => (
         <div key={c.id} style={{ ...cardStyle, marginBottom: 10, padding: "16px 18px" }}>
-          <div onClick={() => setExpandedId(expandedId === c.id ? null : c.id)} style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div onClick={() => toggleExpand(c)} style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 15 }}>✅</span>
               <div>
@@ -769,24 +788,29 @@ function ChecklistAnalysis({ completions, users, onPhotoClick }) {
           </div>
           {expandedId === c.id && (
             <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #13131e" }}>
-              {c.items.map((item, i) => (
-                <div key={i} style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 13, color: "#aaa", display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ color: "#34d399" }}>✓</span> {item.text}
-                  </div>
-                  {item.photo && (
-                    <img src={item.photo} onClick={() => onPhotoClick(item.photo)} style={{ width: 140, height: 105, objectFit: "cover", borderRadius: 8, border: "1px solid #1e1e2e", marginTop: 6, marginLeft: 20, cursor: "pointer" }} title="Clique para ampliar" />
-                  )}
-                  {item.photos && item.photos.length > 0 && (
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6, marginLeft: 20 }}>
-                      {item.photos.map((photo, pi) => (
-                        <img key={pi} src={photo} onClick={() => onPhotoClick(photo)} style={{ width: 120, height: 90, objectFit: "cover", borderRadius: 8, border: "1px solid #1e1e2e", cursor: "pointer", transition: "opacity 0.15s" }} title="Clique para ampliar"
-                          onMouseEnter={e => e.target.style.opacity = 0.8} onMouseLeave={e => e.target.style.opacity = 1} />
-                      ))}
+              {(detailCache[c.id] || c.items).map((item, i) => {
+                const fullItem = detailCache[c.id]?.[i] || item;
+                const photos = fullItem.photos || (fullItem.photo ? [fullItem.photo] : []);
+                const pendingCount = (item.photoCount || 0) - photos.length;
+                return (
+                  <div key={i} style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 13, color: "#aaa", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ color: "#34d399" }}>✓</span> {item.text}
                     </div>
-                  )}
-                </div>
-              ))}
+                    {photos.length > 0 && (
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6, marginLeft: 20 }}>
+                        {photos.map((photo, pi) => (
+                          <img key={pi} src={photo} onClick={() => onPhotoClick(photo)} style={{ width: 120, height: 90, objectFit: "cover", borderRadius: 8, border: "1px solid #1e1e2e", cursor: "pointer", transition: "opacity 0.15s" }} title="Clique para ampliar"
+                            onMouseEnter={e => e.target.style.opacity = 0.8} onMouseLeave={e => e.target.style.opacity = 1} />
+                        ))}
+                      </div>
+                    )}
+                    {pendingCount > 0 && loadingId === c.id && (
+                      <div style={{ fontSize: 11, color: "#555", marginTop: 6, marginLeft: 20 }}>Carregando {pendingCount} foto{pendingCount > 1 ? "s" : ""}...</div>
+                    )}
+                  </div>
+                );
+              })}
               <div style={{ fontSize: 10, color: "#333", marginTop: 8 }}>Expira em {formatDateBR(c.expiresAt)}</div>
             </div>
           )}
