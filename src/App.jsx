@@ -471,6 +471,7 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
   const [activeId, setActiveId] = useState(null);
   const [checked, setChecked] = useState({});
   const [photos, setPhotos] = useState({});
+  const [saving, setSaving] = useState(false);
 
   const today = todayISO();
 
@@ -531,20 +532,31 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
     });
   };
 
-  const submit = (tpl) => {
+  const submit = async (tpl) => {
+    if (saving) return;
     const allChecked = tpl.items.every((_, i) => checked[i]);
     const photosOk = tpl.items.every((item, i) => !item.requiresPhoto || (photos[i] && photos[i].length > 0));
     if (!allChecked) return alert("Complete todos os itens antes de finalizar.");
     if (!photosOk) return alert("Tire foto dos itens obrigatórios (📷).");
 
-    onComplete({
+    const comp = {
       id: uid(), templateId: tpl.id, templateTitle: tpl.title, category: tpl.category,
       userId: currentUser.id, userName: currentUser.name,
       date: today, time: nowTime(), timestamp: Date.now(),
       items: tpl.items.map((item, i) => ({ text: item.text, photos: photos[i] || [] })),
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-    });
-    setActiveId(null); setChecked({}); setPhotos({});
+    };
+
+    setSaving(true);
+    try {
+      await onComplete(comp);
+      setActiveId(null); setChecked({}); setPhotos({});
+    } catch {
+      alert("⚠️ Sem conexão — checklist salvo no aparelho. Será enviado automaticamente quando a internet voltar. NÃO feche o app ainda.");
+      setActiveId(null); setChecked({}); setPhotos({});
+    } finally {
+      setSaving(false);
+    }
   };
 
   const activeTpl = templates.find(t => t.id === activeId);
@@ -593,9 +605,9 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
             </div>
           ))}
 
-          <button onClick={() => submit(activeTpl)}
-            style={{ width: "100%", marginTop: 20, padding: "12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #34d399, #059669)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            Finalizar checklist
+          <button onClick={() => submit(activeTpl)} disabled={saving}
+            style={{ width: "100%", marginTop: 20, padding: "12px", borderRadius: 10, border: "none", background: saving ? "#555" : "linear-gradient(135deg, #34d399, #059669)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: saving ? 0.8 : 1 }}>
+            {saving ? "Salvando... (mantenha o app aberto)" : "Finalizar checklist"}
           </button>
         </div>
       </div>
@@ -1034,7 +1046,13 @@ function ProductionManageView({ items, onAdd, onUpdate, onRemove }) {
 export default function App() {
   // Auth
   const [users, setUsers] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("kuali_user")) || null; } catch { return null; }
+  });
+  useEffect(() => {
+    if (currentUser) localStorage.setItem("kuali_user", JSON.stringify(currentUser));
+    else localStorage.removeItem("kuali_user");
+  }, [currentUser]);
   const [dataLoaded, setDataLoaded] = useState(false);
 
   // Navigation
@@ -1082,6 +1100,27 @@ export default function App() {
 
   // handleDrop hook before early return
   const handleDrop = useCallback(e => { e.preventDefault(); setDragOver(false); }, []);
+
+  // ── Flush offline queue (checklists salvos localmente por falha de conexão) ──
+  useEffect(() => {
+    if (!currentUser) return;
+    const queue = (() => { try { return JSON.parse(localStorage.getItem("pendingClCompletions") || "[]"); } catch { return []; } })();
+    if (!queue.length) return;
+    (async () => {
+      const failed = [];
+      for (const comp of queue) {
+        try {
+          const r = await fetch("/api/cl-completions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(comp) });
+          if (!r.ok) throw new Error();
+        } catch { failed.push(comp); }
+      }
+      localStorage.setItem("pendingClCompletions", JSON.stringify(failed));
+      if (failed.length < queue.length) {
+        // At least one succeeded; refresh completions so admin sees them
+        fetch("/api/cl-completions").then(r => r.json()).then(setClCompletions).catch(() => { });
+      }
+    })();
+  }, [currentUser]);
 
   // ── Load all data from backend (1 request) ──
   useEffect(() => {
@@ -1146,6 +1185,12 @@ export default function App() {
 
   // ── API-backed data operations ──
   const api = (url, opts = {}) => fetch(url, { headers: { "Content-Type": "application/json" }, ...opts }).catch(() => { });
+  // Reliable POST: throws on failure so caller can react (retry, show error, etc.)
+  const apiReliable = async (url, opts = {}) => {
+    const r = await fetch(url, { headers: { "Content-Type": "application/json" }, ...opts });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json().catch(() => ({}));
+  };
 
   // Users
   const addUser = (user) => { setUsers(prev => [...prev, user]); api("/api/users", { method: "POST", body: JSON.stringify(user) }); };
@@ -1162,8 +1207,20 @@ export default function App() {
   const updateClTemplate = (id, data) => { setClTemplates(prev => prev.map(t => t.id === id ? { ...t, ...data } : t)); api(`/api/cl-templates/${id}`, { method: "PUT", body: JSON.stringify(data) }); };
   const removeClTemplate = (id) => { setClTemplates(prev => prev.filter(t => t.id !== id)); api(`/api/cl-templates/${id}`, { method: "DELETE" }); };
 
-  // Checklist Completions
-  const addClCompletion = (comp) => { setClCompletions(prev => [...prev, comp]); api("/api/cl-completions", { method: "POST", body: JSON.stringify(comp) }); };
+  // Checklist Completions — must be reliable; on failure, queue in localStorage for retry
+  const addClCompletion = async (comp) => {
+    setClCompletions(prev => [...prev, comp]);
+    try {
+      await apiReliable("/api/cl-completions", { method: "POST", body: JSON.stringify(comp) });
+    } catch (err) {
+      try {
+        const queue = JSON.parse(localStorage.getItem("pendingClCompletions") || "[]");
+        queue.push(comp);
+        localStorage.setItem("pendingClCompletions", JSON.stringify(queue));
+      } catch { }
+      throw err;
+    }
+  };
 
   // Production
   const addProdItem = async (data) => {
