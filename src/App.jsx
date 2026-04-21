@@ -676,14 +676,12 @@ function ChecklistAnalysis({ completions, users, onPhotoClick }) {
     if (expandedId === c.id) { setExpandedId(null); return; }
     setExpandedId(c.id);
     if (detailCache[c.id]) return;
-    const hasPhotos = c.items.some(it => (it.photoCount || 0) > 0);
-    if (!hasPhotos) return;
     setLoadingId(c.id);
     try {
       const r = await fetch(`/api/cl-completions/${c.id}`);
       if (r.ok) {
         const full = await r.json();
-        setDetailCache(prev => ({ ...prev, [c.id]: full.items }));
+        setDetailCache(prev => ({ ...prev, [c.id]: full.items || [] }));
       }
     } catch { }
     finally { setLoadingId(null); }
@@ -788,10 +786,11 @@ function ChecklistAnalysis({ completions, users, onPhotoClick }) {
           </div>
           {expandedId === c.id && (
             <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #13131e" }}>
-              {(detailCache[c.id] || c.items).map((item, i) => {
-                const fullItem = detailCache[c.id]?.[i] || item;
-                const photos = fullItem.photos || (fullItem.photo ? [fullItem.photo] : []);
-                const pendingCount = (item.photoCount || 0) - photos.length;
+              {loadingId === c.id && !detailCache[c.id] && (
+                <div style={{ fontSize: 12, color: "#555", padding: "4px 0" }}>Carregando detalhes...</div>
+              )}
+              {(detailCache[c.id] || []).map((item, i) => {
+                const photos = item.photos || (item.photo ? [item.photo] : []);
                 return (
                   <div key={i} style={{ marginBottom: 10 }}>
                     <div style={{ fontSize: 13, color: "#aaa", display: "flex", alignItems: "center", gap: 6 }}>
@@ -804,9 +803,6 @@ function ChecklistAnalysis({ completions, users, onPhotoClick }) {
                             onMouseEnter={e => e.target.style.opacity = 0.8} onMouseLeave={e => e.target.style.opacity = 1} />
                         ))}
                       </div>
-                    )}
-                    {pendingCount > 0 && loadingId === c.id && (
-                      <div style={{ fontSize: 11, color: "#555", marginTop: 6, marginLeft: 20 }}>Carregando {pendingCount} foto{pendingCount > 1 ? "s" : ""}...</div>
                     )}
                   </div>
                 );

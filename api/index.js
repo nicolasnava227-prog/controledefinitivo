@@ -138,9 +138,11 @@ app.put("/api/cl-templates/:id", async (req, res) => {
 app.delete("/api/cl-templates/:id", async (req, res) => { await exec("DELETE FROM clTemplates WHERE id=?", [req.params.id]); res.json({ ok: true }); });
 
 // ── Checklist Completions ──
+// Não trafega a coluna "items" no listing — ela pode ter vários MB de fotos base64.
+// O frontend carrega os items sob demanda via /api/cl-completions/:id quando o admin expande.
 app.get("/api/cl-completions", async (_, res) => {
-  const r = await exec("SELECT id, templateId, templateTitle, category, userId, userName, date, time, timestamp, items, expiresAt FROM clCompletions ORDER BY timestamp DESC");
-  res.json(r.rows.map(c => ({ ...c, items: stripPhotos(JSON.parse(c.items)) })));
+  const r = await exec("SELECT id, templateId, templateTitle, category, userId, userName, date, time, timestamp, expiresAt FROM clCompletions ORDER BY timestamp DESC");
+  res.json(r.rows);
 });
 app.post("/api/cl-completions", async (req, res) => {
   const c = req.body;
@@ -214,7 +216,7 @@ app.get("/api/bootstrap", async (_, res) => {
       "SELECT COUNT(*) as c FROM invoiceItems",
       "SELECT * FROM catalog",
       "SELECT * FROM clTemplates",
-      "SELECT id, templateId, templateTitle, category, userId, userName, date, time, timestamp, items, expiresAt FROM clCompletions ORDER BY timestamp DESC",
+      "SELECT id, templateId, templateTitle, category, userId, userName, date, time, timestamp, expiresAt FROM clCompletions ORDER BY timestamp DESC",
       "SELECT * FROM reminders ORDER BY timestamp DESC",
       "SELECT * FROM productionItems ORDER BY sortOrder ASC, name ASC",
       "SELECT * FROM productionCycle WHERE id=1",
@@ -225,7 +227,7 @@ app.get("/api/bootstrap", async (_, res) => {
       itemsTotal: Number(iCount.rows[0].c),
       catalog: c.rows,
       clTemplates: t.rows.map(x => ({ ...x, items: JSON.parse(x.items) })),
-      clCompletions: co.rows.map(x => ({ ...x, items: stripPhotos(JSON.parse(x.items)) })),
+      clCompletions: co.rows,
       reminders: rem.rows,
       productionItems: pi.rows,
       productionCycle: pc.rows[0] || { id: 1, cycleKey: null, concludedAt: null },
