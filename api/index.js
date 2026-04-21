@@ -203,13 +203,15 @@ app.put("/api/production/cycle", async (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Bootstrap: carrega todos os dados iniciais em 1 request (sem fotos dos checklists) ──
+// ── Bootstrap: carrega dados iniciais em 1 request (items limitados aos 500 mais recentes) ──
+const BOOTSTRAP_ITEMS_LIMIT = 500;
 app.get("/api/bootstrap", async (_, res) => {
   try {
     const db = getDb();
-    const [u, i, c, t, co, rem, pi, pc] = await db.batch([
+    const [u, i, iCount, c, t, co, rem, pi, pc] = await db.batch([
       "SELECT * FROM users",
-      "SELECT * FROM invoiceItems ORDER BY isoDate DESC",
+      `SELECT * FROM invoiceItems ORDER BY isoDate DESC LIMIT ${BOOTSTRAP_ITEMS_LIMIT}`,
+      "SELECT COUNT(*) as c FROM invoiceItems",
       "SELECT * FROM catalog",
       "SELECT * FROM clTemplates",
       "SELECT id, templateId, templateTitle, category, userId, userName, date, time, timestamp, items, expiresAt FROM clCompletions ORDER BY timestamp DESC",
@@ -220,6 +222,7 @@ app.get("/api/bootstrap", async (_, res) => {
     res.json({
       users: u.rows.map(x => ({ ...x, isAdmin: bool(x.isAdmin) })),
       items: i.rows.map(x => ({ ...x, matched: bool(x.matched) })),
+      itemsTotal: Number(iCount.rows[0].c),
       catalog: c.rows,
       clTemplates: t.rows.map(x => ({ ...x, items: JSON.parse(x.items) })),
       clCompletions: co.rows.map(x => ({ ...x, items: stripPhotos(JSON.parse(x.items)) })),
@@ -227,6 +230,14 @@ app.get("/api/bootstrap", async (_, res) => {
       productionItems: pi.rows,
       productionCycle: pc.rows[0] || { id: 1, cycleKey: null, concludedAt: null },
     });
+  } catch (err) { res.status(500).json({ error: String(err.message) }); }
+});
+
+// Carrega itens antigos sob demanda (quando admin filtra período fora dos 500 recentes)
+app.get("/api/items/all", async (_, res) => {
+  try {
+    const r = await exec("SELECT * FROM invoiceItems ORDER BY isoDate DESC");
+    res.json(r.rows.map(x => ({ ...x, matched: bool(x.matched) })));
   } catch (err) { res.status(500).json({ error: String(err.message) }); }
 });
 

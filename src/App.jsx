@@ -1146,7 +1146,7 @@ export default function App() {
     })();
   }, [currentUser]);
 
-  // ── Load all data from backend (1 request) ──
+  // ── Load all data from backend (1 request, itens limitados a 500 mais recentes) ──
   useEffect(() => {
     if (!currentUser) return;
     fetch("/api/bootstrap").then(r => r.json()).then(d => {
@@ -1160,6 +1160,16 @@ export default function App() {
       setProdCycle(d.productionCycle || { cycleKey: null, concludedAt: null });
       if ((d.reminders || []).length > 0) setShowReminders(true);
       setDataLoaded(true);
+
+      // Se houver mais itens além dos 500 recentes, baixa o resto em background
+      // (não bloqueia a UI — usuário já pode trabalhar com os itens recentes)
+      if (d.itemsTotal && d.itemsTotal > (d.items || []).length) {
+        setTimeout(() => {
+          fetch("/api/items/all").then(r => r.json()).then(all => {
+            if (Array.isArray(all)) setItems(all);
+          }).catch(() => { });
+        }, 500);
+      }
     }).catch(err => console.error("Erro ao carregar dados:", err));
   }, [currentUser]);
 
