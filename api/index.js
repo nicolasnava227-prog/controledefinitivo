@@ -1,45 +1,51 @@
 import express from "express";
-import { createClient } from "@libsql/client";
+import pg from "pg";
+const { Pool, types } = pg;
+
+// BIGINT (OID 20) retorna como string por padrão em pg — converte para Number
+// (timestamps em ms cabem em Number.MAX_SAFE_INTEGER até o ano ~285.000)
+types.setTypeParser(20, v => (v === null ? null : Number(v)));
 
 const API_KEY = process.env.ANTHROPIC_API_KEY || "";
 const IS_VERCEL = !!process.env.VERCEL;
 
-let db = null;
-function getDb() {
-  if (db) return db;
-  if (IS_VERCEL && !process.env.TURSO_DATABASE_URL) {
-    throw new Error("TURSO_DATABASE_URL não configurada. Adicione em Vercel → Settings → Environment Variables e faça Redeploy.");
+let pool = null;
+function getPool() {
+  if (pool) return pool;
+  if (IS_VERCEL && !process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL não configurada. Adicione em Vercel → Settings → Environment Variables e faça Redeploy.");
   }
-  db = createClient({
-    url: process.env.TURSO_DATABASE_URL || "file:kuali.db",
-    authToken: process.env.TURSO_AUTH_TOKEN,
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+    max: 5,
   });
-  return db;
+  return pool;
 }
 
 let initPromise = null;
 async function init() {
   if (initPromise) return initPromise;
   initPromise = (async () => {
-    const db = getDb();
-    await db.batch([
-      `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT, username TEXT UNIQUE, password TEXT, role TEXT, isAdmin INTEGER DEFAULT 0)`,
-      `CREATE TABLE IF NOT EXISTS invoiceItems (id TEXT PRIMARY KEY, product TEXT, originalName TEXT, matched INTEGER DEFAULT 0, quantity REAL, unit TEXT, unitPrice REAL, totalPrice REAL, category TEXT, supplier TEXT, date TEXT, isoDate TEXT, processedAt TEXT)`,
-      `CREATE TABLE IF NOT EXISTS catalog (id TEXT PRIMARY KEY, name TEXT, category TEXT)`,
-      `CREATE TABLE IF NOT EXISTS punches (id TEXT PRIMARY KEY, userId TEXT, userName TEXT, userRole TEXT, date TEXT, time TEXT, type TEXT, timestamp INTEGER)`,
-      `CREATE TABLE IF NOT EXISTS clTemplates (id TEXT PRIMARY KEY, title TEXT, category TEXT, items TEXT, createdAt TEXT)`,
-      `CREATE TABLE IF NOT EXISTS clCompletions (id TEXT PRIMARY KEY, templateId TEXT, templateTitle TEXT, category TEXT, userId TEXT, userName TEXT, date TEXT, time TEXT, timestamp INTEGER, items TEXT, expiresAt TEXT)`,
-      `CREATE TABLE IF NOT EXISTS reminders (id TEXT PRIMARY KEY, text TEXT, authorId TEXT, authorName TEXT, createdAt TEXT, timestamp INTEGER)`,
-      `CREATE TABLE IF NOT EXISTS productionItems (id TEXT PRIMARY KEY, name TEXT, unit TEXT, minQty REAL DEFAULT 0, qty REAL, cycleKey TEXT, sortOrder INTEGER DEFAULT 0)`,
-      `CREATE TABLE IF NOT EXISTS productionCycle (id INTEGER PRIMARY KEY CHECK (id = 1), cycleKey TEXT, concludedAt TEXT)`,
-      `INSERT OR IGNORE INTO productionCycle (id, cycleKey, concludedAt) VALUES (1, NULL, NULL)`,
-      `CREATE INDEX IF NOT EXISTS idx_items_isodate ON invoiceItems(isoDate DESC)`,
-      `CREATE INDEX IF NOT EXISTS idx_punches_timestamp ON punches(timestamp DESC)`,
-      `CREATE INDEX IF NOT EXISTS idx_clcompletions_timestamp ON clCompletions(timestamp DESC)`,
-      `CREATE INDEX IF NOT EXISTS idx_reminders_timestamp ON reminders(timestamp DESC)`,
-      `CREATE INDEX IF NOT EXISTS idx_production_sort ON productionItems(sortOrder ASC, name ASC)`,
-      `INSERT OR IGNORE INTO users (id, name, username, password, role, isAdmin) VALUES ('admin', 'Administrador', 'admin', 'admin', 'Gerente', 1)`,
-    ]);
+    const p = getPool();
+    await p.query(`
+      CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT, username TEXT UNIQUE, password TEXT, role TEXT, "isAdmin" INTEGER DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS "invoiceItems" (id TEXT PRIMARY KEY, product TEXT, "originalName" TEXT, matched INTEGER DEFAULT 0, quantity DOUBLE PRECISION, unit TEXT, "unitPrice" DOUBLE PRECISION, "totalPrice" DOUBLE PRECISION, category TEXT, supplier TEXT, date TEXT, "isoDate" TEXT, "processedAt" TEXT);
+      CREATE TABLE IF NOT EXISTS catalog (id TEXT PRIMARY KEY, name TEXT, category TEXT);
+      CREATE TABLE IF NOT EXISTS punches (id TEXT PRIMARY KEY, "userId" TEXT, "userName" TEXT, "userRole" TEXT, date TEXT, time TEXT, type TEXT, timestamp BIGINT);
+      CREATE TABLE IF NOT EXISTS "clTemplates" (id TEXT PRIMARY KEY, title TEXT, category TEXT, items TEXT, "createdAt" TEXT);
+      CREATE TABLE IF NOT EXISTS "clCompletions" (id TEXT PRIMARY KEY, "templateId" TEXT, "templateTitle" TEXT, category TEXT, "userId" TEXT, "userName" TEXT, date TEXT, time TEXT, timestamp BIGINT, items TEXT, "expiresAt" TEXT);
+      CREATE TABLE IF NOT EXISTS reminders (id TEXT PRIMARY KEY, text TEXT, "authorId" TEXT, "authorName" TEXT, "createdAt" TEXT, timestamp BIGINT);
+      CREATE TABLE IF NOT EXISTS "productionItems" (id TEXT PRIMARY KEY, name TEXT, unit TEXT, "minQty" DOUBLE PRECISION DEFAULT 0, qty DOUBLE PRECISION, "cycleKey" TEXT, "sortOrder" INTEGER DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS "productionCycle" (id INTEGER PRIMARY KEY CHECK (id = 1), "cycleKey" TEXT, "concludedAt" TEXT);
+      INSERT INTO "productionCycle" (id, "cycleKey", "concludedAt") VALUES (1, NULL, NULL) ON CONFLICT (id) DO NOTHING;
+      CREATE INDEX IF NOT EXISTS idx_items_isodate ON "invoiceItems"("isoDate" DESC);
+      CREATE INDEX IF NOT EXISTS idx_punches_timestamp ON punches(timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_clcompletions_timestamp ON "clCompletions"(timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_reminders_timestamp ON reminders(timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_production_sort ON "productionItems"("sortOrder" ASC, name ASC);
+      INSERT INTO users (id, name, username, password, role, "isAdmin") VALUES ('admin', 'Administrador', 'admin', 'admin', 'Gerente', 1) ON CONFLICT (id) DO NOTHING;
+    `);
   })();
   return initPromise;
 }
@@ -50,13 +56,13 @@ app.use(async (req, res, next) => {
   try { await init(); next(); } catch (e) { res.status(500).json({ error: String(e.message) }); }
 });
 
-const exec = (sql, args = []) => getDb().execute({ sql, args });
-const bool = v => !!(typeof v === "bigint" ? Number(v) : v);
-// Remove fotos (base64 pesado) dos items, mantendo só contagem — usado em listagens
-const stripPhotos = items => (items || []).map(it => ({
-  text: it.text,
-  photoCount: (it.photos || []).length + (it.photo ? 1 : 0),
-}));
+// Converte placeholders "?" → "$1, $2, ..." pra reaproveitar o estilo SQLite
+const exec = (sql, args = []) => {
+  let i = 0;
+  const converted = sql.replace(/\?/g, () => `$${++i}`);
+  return getPool().query(converted, args);
+};
+const bool = v => !!v;
 
 // ── Auth ──
 app.post("/api/login", async (req, res) => {
@@ -75,13 +81,13 @@ app.get("/api/users", async (_, res) => {
 app.post("/api/users", async (req, res) => {
   const { id, name, username, password, role, isAdmin } = req.body;
   try {
-    await exec("INSERT INTO users (id, name, username, password, role, isAdmin) VALUES (?,?,?,?,?,?)", [id, name, username, password, role, isAdmin ? 1 : 0]);
+    await exec(`INSERT INTO users (id, name, username, password, role, "isAdmin") VALUES (?,?,?,?,?,?)`, [id, name, username, password, role, isAdmin ? 1 : 0]);
     res.json({ ok: true });
   } catch { res.status(400).json({ error: "Usuário já existe" }); }
 });
 app.put("/api/users/:id", async (req, res) => {
   const { name, username, password, role, isAdmin } = req.body;
-  await exec("UPDATE users SET name=?, username=?, password=?, role=?, isAdmin=? WHERE id=?", [name, username, password, role, isAdmin ? 1 : 0, req.params.id]);
+  await exec(`UPDATE users SET name=?, username=?, password=?, role=?, "isAdmin"=? WHERE id=?`, [name, username, password, role, isAdmin ? 1 : 0, req.params.id]);
   res.json({ ok: true });
 });
 app.delete("/api/users/:id", async (req, res) => {
@@ -92,18 +98,18 @@ app.delete("/api/users/:id", async (req, res) => {
 
 // ── Invoice Items ──
 app.get("/api/items", async (_, res) => {
-  const r = await exec("SELECT * FROM invoiceItems ORDER BY isoDate DESC");
+  const r = await exec(`SELECT * FROM "invoiceItems" ORDER BY "isoDate" DESC`);
   res.json(r.rows.map(i => ({ ...i, matched: bool(i.matched) })));
 });
 app.post("/api/items", async (req, res) => {
   for (const i of req.body) {
-    await exec("INSERT INTO invoiceItems (id, product, originalName, matched, quantity, unit, unitPrice, totalPrice, category, supplier, date, isoDate, processedAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    await exec(`INSERT INTO "invoiceItems" (id, product, "originalName", matched, quantity, unit, "unitPrice", "totalPrice", category, supplier, date, "isoDate", "processedAt") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [i.id, i.product, i.originalName || "", i.matched ? 1 : 0, i.quantity, i.unit, i.unitPrice, i.totalPrice, i.category, i.supplier, i.date, i.isoDate, i.processedAt]);
   }
   res.json({ ok: true });
 });
-app.delete("/api/items/:id", async (req, res) => { await exec("DELETE FROM invoiceItems WHERE id=?", [req.params.id]); res.json({ ok: true }); });
-app.delete("/api/items", async (_, res) => { await exec("DELETE FROM invoiceItems"); res.json({ ok: true }); });
+app.delete("/api/items/:id", async (req, res) => { await exec(`DELETE FROM "invoiceItems" WHERE id=?`, [req.params.id]); res.json({ ok: true }); });
+app.delete("/api/items", async (_, res) => { await exec(`DELETE FROM "invoiceItems"`); res.json({ ok: true }); });
 
 // ── Catalog ──
 app.get("/api/catalog", async (_, res) => { const r = await exec("SELECT * FROM catalog"); res.json(r.rows); });
@@ -115,38 +121,38 @@ app.delete("/api/catalog/:id", async (req, res) => { await exec("DELETE FROM cat
 app.get("/api/punches", async (_, res) => { const r = await exec("SELECT * FROM punches ORDER BY timestamp DESC"); res.json(r.rows); });
 app.post("/api/punches", async (req, res) => {
   const p = req.body;
-  await exec("INSERT INTO punches (id, userId, userName, userRole, date, time, type, timestamp) VALUES (?,?,?,?,?,?,?,?)",
+  await exec(`INSERT INTO punches (id, "userId", "userName", "userRole", date, time, type, timestamp) VALUES (?,?,?,?,?,?,?,?)`,
     [p.id, p.userId, p.userName, p.userRole, p.date, p.time, p.type, p.timestamp]);
   res.json({ ok: true });
 });
 
 // ── Checklist Templates ──
 app.get("/api/cl-templates", async (_, res) => {
-  const r = await exec("SELECT * FROM clTemplates");
+  const r = await exec(`SELECT * FROM "clTemplates"`);
   res.json(r.rows.map(t => ({ ...t, items: JSON.parse(t.items) })));
 });
 app.post("/api/cl-templates", async (req, res) => {
   const t = req.body;
-  await exec("INSERT INTO clTemplates (id, title, category, items, createdAt) VALUES (?,?,?,?,?)", [t.id, t.title, t.category, JSON.stringify(t.items), t.createdAt]);
+  await exec(`INSERT INTO "clTemplates" (id, title, category, items, "createdAt") VALUES (?,?,?,?,?)`, [t.id, t.title, t.category, JSON.stringify(t.items), t.createdAt]);
   res.json({ ok: true });
 });
 app.put("/api/cl-templates/:id", async (req, res) => {
   const { title, category, items } = req.body;
-  await exec("UPDATE clTemplates SET title=?, category=?, items=? WHERE id=?", [title, category, JSON.stringify(items), req.params.id]);
+  await exec(`UPDATE "clTemplates" SET title=?, category=?, items=? WHERE id=?`, [title, category, JSON.stringify(items), req.params.id]);
   res.json({ ok: true });
 });
-app.delete("/api/cl-templates/:id", async (req, res) => { await exec("DELETE FROM clTemplates WHERE id=?", [req.params.id]); res.json({ ok: true }); });
+app.delete("/api/cl-templates/:id", async (req, res) => { await exec(`DELETE FROM "clTemplates" WHERE id=?`, [req.params.id]); res.json({ ok: true }); });
 
 // ── Checklist Completions ──
 // Não trafega a coluna "items" no listing — ela pode ter vários MB de fotos base64.
 // O frontend carrega os items sob demanda via /api/cl-completions/:id quando o admin expande.
 app.get("/api/cl-completions", async (_, res) => {
-  const r = await exec("SELECT id, templateId, templateTitle, category, userId, userName, date, time, timestamp, expiresAt FROM clCompletions ORDER BY timestamp DESC");
+  const r = await exec(`SELECT id, "templateId", "templateTitle", category, "userId", "userName", date, time, timestamp, "expiresAt" FROM "clCompletions" ORDER BY timestamp DESC`);
   res.json(r.rows);
 });
 app.post("/api/cl-completions", async (req, res) => {
   const c = req.body;
-  await exec("INSERT INTO clCompletions (id, templateId, templateTitle, category, userId, userName, date, time, timestamp, items, expiresAt) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+  await exec(`INSERT INTO "clCompletions" (id, "templateId", "templateTitle", category, "userId", "userName", date, time, timestamp, items, "expiresAt") VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
     [c.id, c.templateId, c.templateTitle, c.category, c.userId, c.userName, c.date, c.time, c.timestamp, JSON.stringify(c.items), c.expiresAt]);
   res.json({ ok: true });
 });
@@ -158,7 +164,7 @@ app.get("/api/reminders", async (_, res) => {
 });
 app.post("/api/reminders", async (req, res) => {
   const r = req.body;
-  await exec("INSERT INTO reminders (id, text, authorId, authorName, createdAt, timestamp) VALUES (?,?,?,?,?,?)",
+  await exec(`INSERT INTO reminders (id, text, "authorId", "authorName", "createdAt", timestamp) VALUES (?,?,?,?,?,?)`,
     [r.id, r.text, r.authorId, r.authorName, r.createdAt, r.timestamp]);
   res.json({ ok: true });
 });
@@ -166,12 +172,12 @@ app.delete("/api/reminders/:id", async (req, res) => { await exec("DELETE FROM r
 
 // ── Production ──
 app.get("/api/production/items", async (_, res) => {
-  const r = await exec("SELECT * FROM productionItems ORDER BY sortOrder ASC, name ASC");
+  const r = await exec(`SELECT * FROM "productionItems" ORDER BY "sortOrder" ASC, name ASC`);
   res.json(r.rows);
 });
 app.post("/api/production/items", async (req, res) => {
   const { id, name, unit, minQty, sortOrder } = req.body;
-  await exec("INSERT INTO productionItems (id, name, unit, minQty, qty, cycleKey, sortOrder) VALUES (?,?,?,?,NULL,NULL,?)",
+  await exec(`INSERT INTO "productionItems" (id, name, unit, "minQty", qty, "cycleKey", "sortOrder") VALUES (?,?,?,?,NULL,NULL,?)`,
     [id, name, unit || "und", Number(minQty) || 0, Number(sortOrder) || 0]);
   res.json({ ok: true });
 });
@@ -181,26 +187,26 @@ app.put("/api/production/items/:id", async (req, res) => {
   const args = [];
   if (name !== undefined) { fields.push("name=?"); args.push(name); }
   if (unit !== undefined) { fields.push("unit=?"); args.push(unit); }
-  if (minQty !== undefined) { fields.push("minQty=?"); args.push(Number(minQty) || 0); }
+  if (minQty !== undefined) { fields.push(`"minQty"=?`); args.push(Number(minQty) || 0); }
   if (qty !== undefined) { fields.push("qty=?"); args.push(qty === null ? null : Number(qty)); }
-  if (cycleKey !== undefined) { fields.push("cycleKey=?"); args.push(cycleKey); }
-  if (sortOrder !== undefined) { fields.push("sortOrder=?"); args.push(Number(sortOrder) || 0); }
+  if (cycleKey !== undefined) { fields.push(`"cycleKey"=?`); args.push(cycleKey); }
+  if (sortOrder !== undefined) { fields.push(`"sortOrder"=?`); args.push(Number(sortOrder) || 0); }
   if (!fields.length) return res.json({ ok: true });
   args.push(req.params.id);
-  await exec(`UPDATE productionItems SET ${fields.join(", ")} WHERE id=?`, args);
+  await exec(`UPDATE "productionItems" SET ${fields.join(", ")} WHERE id=?`, args);
   res.json({ ok: true });
 });
 app.delete("/api/production/items/:id", async (req, res) => {
-  await exec("DELETE FROM productionItems WHERE id=?", [req.params.id]);
+  await exec(`DELETE FROM "productionItems" WHERE id=?`, [req.params.id]);
   res.json({ ok: true });
 });
 app.get("/api/production/cycle", async (_, res) => {
-  const r = await exec("SELECT * FROM productionCycle WHERE id=1");
+  const r = await exec(`SELECT * FROM "productionCycle" WHERE id=1`);
   res.json(r.rows[0] || { id: 1, cycleKey: null, concludedAt: null });
 });
 app.put("/api/production/cycle", async (req, res) => {
   const { cycleKey, concludedAt } = req.body;
-  await exec("UPDATE productionCycle SET cycleKey=?, concludedAt=? WHERE id=1",
+  await exec(`UPDATE "productionCycle" SET "cycleKey"=?, "concludedAt"=? WHERE id=1`,
     [cycleKey ?? null, concludedAt ?? null]);
   res.json({ ok: true });
 });
@@ -209,18 +215,17 @@ app.put("/api/production/cycle", async (req, res) => {
 const BOOTSTRAP_ITEMS_LIMIT = 500;
 app.get("/api/bootstrap", async (_, res) => {
   try {
-    const db = getDb();
-    const [u, i, iCount, c, t, co, rem, pi, pc] = await db.batch([
-      "SELECT * FROM users",
-      `SELECT * FROM invoiceItems ORDER BY isoDate DESC LIMIT ${BOOTSTRAP_ITEMS_LIMIT}`,
-      "SELECT COUNT(*) as c FROM invoiceItems",
-      "SELECT * FROM catalog",
-      "SELECT * FROM clTemplates",
-      "SELECT id, templateId, templateTitle, category, userId, userName, date, time, timestamp, expiresAt FROM clCompletions ORDER BY timestamp DESC",
-      "SELECT * FROM reminders ORDER BY timestamp DESC",
-      "SELECT * FROM productionItems ORDER BY sortOrder ASC, name ASC",
-      "SELECT * FROM productionCycle WHERE id=1",
-    ], "read");
+    const [u, i, iCount, c, t, co, rem, pi, pc] = await Promise.all([
+      exec("SELECT * FROM users"),
+      exec(`SELECT * FROM "invoiceItems" ORDER BY "isoDate" DESC LIMIT ${BOOTSTRAP_ITEMS_LIMIT}`),
+      exec(`SELECT COUNT(*) as c FROM "invoiceItems"`),
+      exec("SELECT * FROM catalog"),
+      exec(`SELECT * FROM "clTemplates"`),
+      exec(`SELECT id, "templateId", "templateTitle", category, "userId", "userName", date, time, timestamp, "expiresAt" FROM "clCompletions" ORDER BY timestamp DESC`),
+      exec("SELECT * FROM reminders ORDER BY timestamp DESC"),
+      exec(`SELECT * FROM "productionItems" ORDER BY "sortOrder" ASC, name ASC`),
+      exec(`SELECT * FROM "productionCycle" WHERE id=1`),
+    ]);
     res.json({
       users: u.rows.map(x => ({ ...x, isAdmin: bool(x.isAdmin) })),
       items: i.rows.map(x => ({ ...x, matched: bool(x.matched) })),
@@ -238,7 +243,7 @@ app.get("/api/bootstrap", async (_, res) => {
 // Carrega itens antigos sob demanda (quando admin filtra período fora dos 500 recentes)
 app.get("/api/items/all", async (_, res) => {
   try {
-    const r = await exec("SELECT * FROM invoiceItems ORDER BY isoDate DESC");
+    const r = await exec(`SELECT * FROM "invoiceItems" ORDER BY "isoDate" DESC`);
     res.json(r.rows.map(x => ({ ...x, matched: bool(x.matched) })));
   } catch (err) { res.status(500).json({ error: String(err.message) }); }
 });
@@ -246,7 +251,7 @@ app.get("/api/items/all", async (_, res) => {
 // ── Single checklist completion com fotos (lazy-load ao expandir na análise) ──
 app.get("/api/cl-completions/:id", async (req, res) => {
   try {
-    const r = await exec("SELECT * FROM clCompletions WHERE id=?", [req.params.id]);
+    const r = await exec(`SELECT * FROM "clCompletions" WHERE id=?`, [req.params.id]);
     if (!r.rows.length) return res.status(404).json({ error: "Não encontrado" });
     const c = r.rows[0];
     res.json({ ...c, items: JSON.parse(c.items) });

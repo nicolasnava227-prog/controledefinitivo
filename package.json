@@ -6,16 +6,18 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "start": "node server.js"
+    "start": "node server.js",
+    "migrate": "node scripts/migrate-turso-to-supabase.js"
   },
   "dependencies": {
-    "@libsql/client": "^0.14.0",
     "dotenv": "^16.4.0",
     "express": "^4.21.0",
+    "pg": "^8.13.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@libsql/client": "^0.14.0",
     "@vitejs/plugin-react": "^4.3.4",
     "vite": "^6.0.0"
   }
