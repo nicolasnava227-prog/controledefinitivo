@@ -489,7 +489,7 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
     setPhotos({});
   };
 
-  const compressImage = (file, maxW = 1280, quality = 0.75) => new Promise((resolve, reject) => {
+  const compressImage = (file, maxW = 1024, quality = 0.65) => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = ev => {
       const img = new Image();
@@ -552,7 +552,8 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
       await onComplete(comp);
       setActiveId(null); setChecked({}); setPhotos({});
     } catch {
-      alert("⚠️ Sem conexão — checklist salvo no aparelho. Será enviado automaticamente quando a internet voltar. NÃO feche o app ainda.");
+      // Já foi salvo no localStorage pelo addClCompletion — vai retransmitir sozinho.
+      alert("✅ Checklist salvo no aparelho.\n\nA conexão falhou agora, mas o app vai enviar automaticamente em segundo plano. Pode continuar usando normalmente.");
       setActiveId(null); setChecked({}); setPhotos({});
     } finally {
       setSaving(false);
@@ -1121,26 +1122,56 @@ export default function App() {
   // handleDrop hook before early return
   const handleDrop = useCallback(e => { e.preventDefault(); setDragOver(false); }, []);
 
-  // ── Flush offline queue (checklists salvos localmente por falha de conexão) ──
+  // ── Helpers para fila de checklists pendentes (offline / falha de POST) ──
+  const readPendingQueue = useCallback(() => {
+    try { return JSON.parse(localStorage.getItem("pendingClCompletions") || "[]"); }
+    catch { return []; }
+  }, []);
+  // Mescla fila pendente com lista do servidor (evita que polling apague optimistic UI)
+  const mergePending = useCallback((serverList) => {
+    const pending = readPendingQueue();
+    if (!pending.length) return serverList;
+    const ids = new Set(serverList.map(c => c.id));
+    return [...serverList, ...pending.filter(p => !ids.has(p.id))];
+  }, [readPendingQueue]);
+  // Tenta enviar todos os checklists pendentes; o que falhar continua na fila
+  const flushPendingQueue = useCallback(async () => {
+    const queue = readPendingQueue();
+    if (!queue.length) return;
+    const failed = [];
+    for (const comp of queue) {
+      try {
+        const r = await fetch("/api/cl-completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(comp),
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      } catch { failed.push(comp); }
+    }
+    localStorage.setItem("pendingClCompletions", JSON.stringify(failed));
+    if (failed.length < queue.length) {
+      // pelo menos um foi enviado — refaz fetch e mescla com remanescentes
+      fetch("/api/cl-completions").then(r => r.json()).then(co => setClCompletions(mergePending(co))).catch(() => { });
+    }
+  }, [readPendingQueue, mergePending]);
+
+  // Dispara o flush em 4 momentos: boot, polling 30s, evento "online" (wifi voltou),
+  // e ao voltar pra aba (visibilitychange) — cobre o caso iPhone Safari matar o fetch.
   useEffect(() => {
     if (!currentUser) return;
-    const queue = (() => { try { return JSON.parse(localStorage.getItem("pendingClCompletions") || "[]"); } catch { return []; } })();
-    if (!queue.length) return;
-    (async () => {
-      const failed = [];
-      for (const comp of queue) {
-        try {
-          const r = await fetch("/api/cl-completions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(comp) });
-          if (!r.ok) throw new Error();
-        } catch { failed.push(comp); }
-      }
-      localStorage.setItem("pendingClCompletions", JSON.stringify(failed));
-      if (failed.length < queue.length) {
-        // At least one succeeded; refresh completions so admin sees them
-        fetch("/api/cl-completions").then(r => r.json()).then(setClCompletions).catch(() => { });
-      }
-    })();
-  }, [currentUser]);
+    flushPendingQueue();
+    const interval = setInterval(flushPendingQueue, 30000);
+    const onOnline = () => flushPendingQueue();
+    const onVisible = () => { if (document.visibilityState === "visible") flushPendingQueue(); };
+    window.addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [currentUser, flushPendingQueue]);
 
   // ── Load all data from backend (1 request, itens limitados a 500 mais recentes) ──
   useEffect(() => {
@@ -1150,7 +1181,7 @@ export default function App() {
       setItems(d.items || []);
       setCatalog(d.catalog || []);
       setClTemplates(d.clTemplates || []);
-      setClCompletions(d.clCompletions || []);
+      setClCompletions(mergePending(d.clCompletions || []));
       setReminders(d.reminders || []);
       setProdItems(d.productionItems || []);
       setProdCycle(d.productionCycle || { cycleKey: null, concludedAt: null });
@@ -1175,10 +1206,10 @@ export default function App() {
       fetch("/api/cl-completions").then(r => r.json()),
       fetch("/api/cl-templates").then(r => r.json()),
     ]).then(([co, t]) => {
-      setClCompletions(co);
+      setClCompletions(mergePending(co));
       setClTemplates(t);
     }).catch(() => { });
-  }, []);
+  }, [mergePending]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -1237,17 +1268,25 @@ export default function App() {
   const updateClTemplate = (id, data) => { setClTemplates(prev => prev.map(t => t.id === id ? { ...t, ...data } : t)); api(`/api/cl-templates/${id}`, { method: "PUT", body: JSON.stringify(data) }); };
   const removeClTemplate = (id) => { setClTemplates(prev => prev.filter(t => t.id !== id)); api(`/api/cl-templates/${id}`, { method: "DELETE" }); };
 
-  // Checklist Completions — must be reliable; on failure, queue in localStorage for retry
+  // Checklist Completions — em caso de falha, vai pra fila do localStorage e
+  // o flushPendingQueue tenta novamente em background (a cada 30s + online + visibility)
   const addClCompletion = async (comp) => {
     setClCompletions(prev => [...prev, comp]);
+    // Sempre persiste na fila ANTES do POST. Se o POST der certo, removemos.
+    // Garante que mesmo se o iPhone Safari matar o fetch, o checklist não some.
+    try {
+      const queue = readPendingQueue();
+      queue.push(comp);
+      localStorage.setItem("pendingClCompletions", JSON.stringify(queue));
+    } catch { }
     try {
       await apiReliable("/api/cl-completions", { method: "POST", body: JSON.stringify(comp) });
-    } catch (err) {
+      // Sucesso: remove da fila
       try {
-        const queue = JSON.parse(localStorage.getItem("pendingClCompletions") || "[]");
-        queue.push(comp);
-        localStorage.setItem("pendingClCompletions", JSON.stringify(queue));
+        const remaining = readPendingQueue().filter(p => p.id !== comp.id);
+        localStorage.setItem("pendingClCompletions", JSON.stringify(remaining));
       } catch { }
+    } catch (err) {
       throw err;
     }
   };
