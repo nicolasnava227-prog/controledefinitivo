@@ -209,43 +209,190 @@ function LoginScreen({ onLogin }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+
+  useEffect(() => {
+    const u = () => setIsOnline(navigator.onLine);
+    window.addEventListener("online", u); window.addEventListener("offline", u);
+    return () => { window.removeEventListener("online", u); window.removeEventListener("offline", u); };
+  }, []);
 
   const handleLogin = async () => {
+    if (!username.trim() || !password.trim()) {
+      setError("Preencha usuário e senha");
+      return;
+    }
     setLoading(true); setError("");
     try {
       const r = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });
-      if (!r.ok) { setError("Usuário ou senha incorretos"); setLoading(false); return; }
+      if (!r.ok) {
+        setError(r.status === 401 ? "Usuário ou senha incorretos" : `Erro do servidor (${r.status})`);
+        setLoading(false);
+        return;
+      }
       const user = await r.json();
       onLogin(user);
     } catch {
+      // Fallback offline: admin/admin sempre entra
       if (username === "admin" && password === "admin") { onLogin(DEFAULT_ADMIN); }
-      else { setError("Usuário ou senha incorretos"); }
+      else { setError("Sem conexão com o servidor"); }
     }
     setLoading(false);
   };
 
+  const inputStyle = {
+    width: "100%",
+    background: K.surface2,
+    border: `1px solid ${K.border}`,
+    borderRadius: 10,
+    padding: "13px 14px",
+    color: K.text,
+    fontFamily: FONT,
+    fontSize: 15,
+    outline: "none",
+    transition: "border-color 120ms ease",
+  };
+
   return (
-    <div style={{ minHeight: "100vh", background: "#08080c", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{
+      minHeight: "100vh",
+      background: K.ink,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontFamily: FONT,
+      padding: 20,
+      position: "relative",
+      overflow: "hidden",
+    }}>
       <style>{CSS}</style>
-      <div className="anim" style={{ width: 380, ...cardStyle, padding: "40px 32px" }}>
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ width: 64, height: 64, borderRadius: 18, background: "linear-gradient(135deg, #6ee7b7 0%, #34d399 50%, #059669 100%)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 700, color: "#064e36", boxShadow: "0 0 48px #34d39925", marginBottom: 16 }}>K</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "#fff" }}>Controle Kuali</div>
-          <div style={{ fontSize: 11, color: "#4a4a5a", letterSpacing: 2.5, textTransform: "uppercase", marginTop: 4 }}>Faça login para continuar</div>
+      {/* Glow ambiente laranja no fundo */}
+      <div style={{
+        position: "absolute",
+        top: "-20%",
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: 600,
+        height: 600,
+        background: `radial-gradient(circle, ${K.orange}1A 0%, transparent 60%)`,
+        pointerEvents: "none",
+      }} />
+
+      <div className="kuali-anim" style={{ width: "100%", maxWidth: 400, position: "relative", zIndex: 1 }}>
+        {/* Marca topo */}
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <KualiMark size={56} />
+          <div style={{ marginTop: 16 }}>
+            <KualiLogo size={28} />
+          </div>
+          <div style={{ ...T.caption, color: K.muted, marginTop: 12 }}>SISTEMA DE GESTÃO OPERACIONAL</div>
         </div>
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Usuário</label>
-          <input value={username} onChange={e => setUsername(e.target.value)} placeholder="seu usuário"
-            style={{ ...inputBase, width: "100%" }} onKeyDown={e => e.key === "Enter" && handleLogin()} />
+
+        {/* Card */}
+        <div style={{
+          background: K.surface,
+          border: `1px solid ${K.border}`,
+          borderRadius: 16,
+          padding: 28,
+          boxShadow: `0 12px 40px rgba(0,0,0,0.4)`,
+        }}>
+          <div style={{ ...T.h2, color: K.text, marginBottom: 4 }}>Bem-vindo de volta</div>
+          <div style={{ ...T.small, color: K.text2, marginBottom: 22 }}>Faça login para continuar.</div>
+
+          {/* Status online/offline */}
+          {!isOnline && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "10px 12px", marginBottom: 16,
+              background: `${K.yellow}1A`, border: `1px solid ${K.yellow}55`,
+              borderRadius: 10, color: K.yellow,
+              ...T.small, fontWeight: 600,
+            }}>
+              <Icon name="wifi-off" size={16} />
+              Sem conexão — só admin/admin funciona offline
+            </div>
+          )}
+
+          {/* Usuário */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 8 }}>Usuário</label>
+            <div style={{ position: "relative" }}>
+              <Icon name="user" size={18} color={K.muted} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+              <input
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder="seu usuário"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                onKeyDown={e => e.key === "Enter" && handleLogin()}
+                onFocus={e => { e.currentTarget.style.borderColor = K.orange; }}
+                onBlur={e => { e.currentTarget.style.borderColor = K.border; }}
+                style={{ ...inputStyle, paddingLeft: 42 }}
+              />
+            </div>
+          </div>
+
+          {/* Senha */}
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 8 }}>Senha</label>
+            <div style={{ position: "relative" }}>
+              <Icon name="alert" size={18} color={K.muted} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", visibility: "hidden" }} />
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="sua senha"
+                onKeyDown={e => e.key === "Enter" && handleLogin()}
+                onFocus={e => { e.currentTarget.style.borderColor = K.orange; }}
+                onBlur={e => { e.currentTarget.style.borderColor = K.border; }}
+                style={{ ...inputStyle, paddingLeft: 14, paddingRight: 44 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(s => !s)}
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                style={{
+                  position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
+                  width: 32, height: 32, borderRadius: 8,
+                  background: "transparent", border: "none", cursor: "pointer",
+                  color: K.muted, display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                <Icon name={showPassword ? "x" : "check-circle"} size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Erro */}
+          {error && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "10px 12px", marginBottom: 14,
+              background: `${K.err}1A`, border: `1px solid ${K.err}55`,
+              borderRadius: 10, color: K.err,
+              ...T.small, fontWeight: 600,
+            }}>
+              <Icon name="alert" size={16} /> {error}
+            </div>
+          )}
+
+          {/* CTA */}
+          <Btn kind="primary" size="lg" full loading={loading} onClick={handleLogin} icon={loading ? undefined : "arrow-right"} style={{ marginTop: 4 }}>
+            {loading ? "Entrando…" : "Entrar"}
+          </Btn>
         </div>
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Senha</label>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="sua senha"
-            style={{ ...inputBase, width: "100%" }} onKeyDown={e => e.key === "Enter" && handleLogin()} />
+
+        {/* Footer */}
+        <div style={{ textAlign: "center", marginTop: 18 }}>
+          <div style={{ ...T.small, color: K.muted, display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <StatusDot kind={isOnline ? "ok" : "warn"} size={6} />
+            {isOnline ? "Servidor conectado" : "Modo offline"}
+          </div>
+          <div style={{ ...T.small, color: K.borderStrong, marginTop: 6 }}>
+            Acesso padrão: <span style={{ ...T.mono, color: K.text2 }}>admin / admin</span>
+          </div>
         </div>
-        {error && <div style={{ color: "#fca5a5", fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>}
-        <button onClick={handleLogin} style={{ width: "100%", padding: "10px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #34d399, #059669)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Entrar</button>
-        <div style={{ textAlign: "center", marginTop: 16, fontSize: 11, color: "#333" }}>Login padrão: admin / admin</div>
       </div>
     </div>
   );
