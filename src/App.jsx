@@ -1,4 +1,6 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import { K, T, FONT, MONO } from "./kuali/tokens";
+import { Btn, Card, Chip, StatusDot, Icon, KualiLogo, KualiMark } from "./kuali/components/ui";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -9,17 +11,36 @@ const CATEGORIES = [
   "Grãos & Cereais", "Temperos & Condimentos", "Óleos & Gorduras",
   "Descartáveis", "Limpeza & Higiene", "Panificação", "Congelados", "Outros",
 ];
+// Paleta de categorias remapeada para os 4 acentos do design system Kuali
+// (verde/vermelho/amarelo/laranja/info) — substitui as 12 cores aleatórias antigas.
 const CAT_COLOR = {
-  "Carnes & Proteínas": "#e74c3c", Hortifruti: "#27ae60", Laticínios: "#f1c40f",
-  Bebidas: "#3498db", "Grãos & Cereais": "#e67e22", "Temperos & Condimentos": "#9b59b6",
-  "Óleos & Gorduras": "#f39c12", Descartáveis: "#95a5a6", "Limpeza & Higiene": "#1abc9c",
-  Panificação: "#d35400", Congelados: "#2980b9", Outros: "#7f8c8d",
+  "Carnes & Proteínas":     K.red,
+  Hortifruti:               K.green,
+  Laticínios:               K.yellow,
+  Bebidas:                  K.info,
+  "Grãos & Cereais":        K.orange,
+  "Temperos & Condimentos": K.red,
+  "Óleos & Gorduras":       K.yellow,
+  Descartáveis:             K.text2,
+  "Limpeza & Higiene":      K.orange,
+  Panificação:              K.orange,
+  Congelados:               K.info,
+  Outros:                   K.muted,
 };
+// Ícones Phosphor (em vez de emoji) — chave usada com <Icon name={CAT_ICON[c]} />
 const CAT_ICON = {
-  "Carnes & Proteínas": "🥩", Hortifruti: "🥬", Laticínios: "🧀", Bebidas: "🥤",
-  "Grãos & Cereais": "🌾", "Temperos & Condimentos": "🌶️", "Óleos & Gorduras": "🫒",
-  Descartáveis: "📦", "Limpeza & Higiene": "🧹", Panificação: "🍞",
-  Congelados: "🧊", Outros: "📋",
+  "Carnes & Proteínas":     "flame",
+  Hortifruti:               "check-circle",
+  Laticínios:               "box",
+  Bebidas:                  "shopping",
+  "Grãos & Cereais":        "box",
+  "Temperos & Condimentos": "flame",
+  "Óleos & Gorduras":       "box",
+  Descartáveis:             "box",
+  "Limpeza & Higiene":      "sparkle",
+  Panificação:              "production",
+  Congelados:               "box",
+  Outros:                   "note",
 };
 const PERIODS = [
   { key: "today", label: "Hoje" }, { key: "week", label: "Esta semana" },
@@ -28,7 +49,25 @@ const PERIODS = [
 ];
 const ROLES = ["Cozinheiro(a)", "Auxiliar de cozinha", "Garçom", "Atendente", "Caixa", "Gerente", "Limpeza", "Entregador", "Outro"];
 const CL_CATS = ["Abertura", "Fechamento", "Limpeza", "Segurança alimentar", "Estoque", "Atendimento", "Outro"];
-const CL_CAT_COLORS = { Abertura: "#f59e0b", Fechamento: "#8b5cf6", Limpeza: "#06b6d4", "Segurança alimentar": "#ef4444", Estoque: "#22c55e", Atendimento: "#ec4899", Outro: "#6b7280" };
+// Cores e ícones das categorias de checklist alinhadas ao design system
+const CL_CAT_COLORS = {
+  Abertura:               K.orange,
+  Fechamento:             K.red,
+  Limpeza:                K.info,
+  "Segurança alimentar":  K.err,
+  Estoque:                K.green,
+  Atendimento:            K.yellow,
+  Outro:                  K.muted,
+};
+const CL_CAT_ICONS = {
+  Abertura:               "flame",
+  Fechamento:             "clock",
+  Limpeza:                "check-circle",
+  "Segurança alimentar":  "alert",
+  Estoque:                "box",
+  Atendimento:            "user",
+  Outro:                  "note",
+};
 
 const DEFAULT_ADMIN = { id: "admin", name: "Administrador", username: "admin", password: "admin", role: "Gerente", isAdmin: true };
 
@@ -324,7 +363,7 @@ function CatalogView({ catalog, onAdd, onUpdate, onRemove }) {
           <div style={{ flex: "0 0 200px" }}>
             <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Categoria</label>
             <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} style={{ ...inputBase, width: "100%" }}>
-              {CATEGORIES.map(c => <option key={c} value={c}>{CAT_ICON[c]} {c}</option>)}
+              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <button onClick={addOrUpdate} style={{ ...actionBtn("#6ee7b7"), fontWeight: 600 }}>{editId ? "Salvar" : "+ Adicionar"}</button>
@@ -336,7 +375,7 @@ function CatalogView({ catalog, onAdd, onUpdate, onRemove }) {
       {grouped.map(({ cat, items }) => (
         <div key={cat} style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <span style={{ fontSize: 15 }}>{CAT_ICON[cat]}</span>
+            <Icon name={CAT_ICON[cat]} size={14} color={CAT_COLOR[cat]} />
             <span style={{ fontSize: 12, fontWeight: 600, color: CAT_COLOR[cat], textTransform: "uppercase", letterSpacing: 1.5 }}>{cat}</span>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -472,6 +511,22 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
   const [checked, setChecked] = useState({});
   const [photos, setPhotos] = useState({});
   const [saving, setSaving] = useState(false);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // Indicador de fila pendente / online no header da tarefa
+  useEffect(() => {
+    const update = () => {
+      setIsOnline(navigator.onLine);
+      try { setPendingCount(JSON.parse(localStorage.getItem("pendingClCompletions") || "[]").length); }
+      catch { setPendingCount(0); }
+    };
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    const t = setInterval(update, 5000);
+    return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update); clearInterval(t); };
+  }, []);
 
   const today = todayISO();
 
@@ -569,94 +624,271 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
     return acc;
   }, []);
 
+  // ── Active task screen (checkbox + foto) ──
   if (activeTpl) {
+    const catColor = CL_CAT_COLORS[activeTpl.category] || K.muted;
+    const catIcon = CL_CAT_ICONS[activeTpl.category] || "note";
+    const doneCount = activeTpl.items.filter((_, i) => checked[i]).length;
+    const pct = Math.round((doneCount / activeTpl.items.length) * 100);
+
     return (
-      <div className="anim" style={{ padding: "20px 28px", maxWidth: 600, margin: "0 auto" }}>
-        <button onClick={() => setActiveId(null)} style={{ ...actionBtn("#888"), marginBottom: 16, fontSize: 11 }}>← Voltar</button>
-        <div style={{ ...cardStyle, padding: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-            <span style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>{activeTpl.title}</span>
-            <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 8, background: (CL_CAT_COLORS[activeTpl.category] || "#666") + "18", color: CL_CAT_COLORS[activeTpl.category] || "#888" }}>{activeTpl.category}</span>
+      <div className="kuali-anim" style={{ background: K.ink, minHeight: "100vh", color: K.text, fontFamily: FONT, paddingBottom: 140 }}>
+        {/* Header sticky */}
+        <div style={{ position: "sticky", top: 0, zIndex: 5, padding: "12px 16px 14px", borderBottom: `1px solid ${K.border}`, background: K.ink, maxWidth: 600, margin: "0 auto" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <button onClick={() => setActiveId(null)} aria-label="Voltar"
+              style={{ width: 40, height: 40, borderRadius: 10, background: K.surface2, border: `1px solid ${K.border}`, color: K.text, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <Icon name="arrow-left" size={20} />
+            </button>
+            {(!isOnline || pendingCount > 0) && (
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, color: K.yellow, ...T.small, fontWeight: 700 }}>
+                <Icon name="wifi-off" size={14} /> {isOnline ? `${pendingCount} na fila` : `Offline · ${pendingCount} na fila`}
+              </div>
+            )}
+            <div style={{ width: 40 }} />
           </div>
-          <div style={{ fontSize: 11, color: "#555", marginBottom: 20 }}>{currentUser.name} · {today}</div>
-
-          {activeTpl.items.map((item, i) => (
-            <div key={i} style={{ padding: "14px 0", borderBottom: i < activeTpl.items.length - 1 ? "1px solid #13131e" : "none" }}>
-              <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
-                <input type="checkbox" checked={!!checked[i]} onChange={e => setChecked(prev => ({ ...prev, [i]: e.target.checked }))}
-                  style={{ accentColor: "#34d399", marginTop: 2, width: 18, height: 18 }} />
-                <span style={{ fontSize: 14, color: checked[i] ? "#6ee7b7" : "#ccc", textDecoration: checked[i] ? "line-through" : "none", flex: 1 }}>{item.text}</span>
-              </label>
-              {item.requiresPhoto && (
-                <div style={{ marginLeft: 30, marginTop: 8 }}>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-                    {(photos[i] || []).map((photo, pi) => (
-                      <div key={pi} style={{ position: "relative", display: "inline-block" }}>
-                        <img src={photo} onClick={() => onPhotoClick(photo)} style={{ width: 100, height: 75, objectFit: "cover", borderRadius: 8, border: "1px solid #1e1e2e", cursor: "pointer" }} title="Clique para ampliar" />
-                        <button onClick={() => removePhoto(i, pi)}
-                          style={{ position: "absolute", top: -6, right: -6, background: "#ef4444", border: "none", borderRadius: "50%", width: 18, height: 18, color: "#fff", fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
-                      </div>
-                    ))}
-                  </div>
-                  <button onClick={() => handlePhoto(i)} style={{ ...actionBtn((photos[i] && photos[i].length > 0) ? "#888" : "#fbbf24"), fontSize: 11, padding: "6px 12px" }}>
-                    📷 {(photos[i] && photos[i].length > 0) ? "Mais fotos" : "Tirar foto (obrigatório)"}
-                  </button>
-                </div>
-              )}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <Chip icon={catIcon} color={catColor} bg={`${catColor}22`}>{activeTpl.category}</Chip>
+            <span style={{ ...T.small, color: K.muted }}>{currentUser.name} · {today}</span>
+          </div>
+          <div style={{ ...T.h1, color: K.text }}>{activeTpl.title}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
+            <div style={{ flex: 1, height: 6, background: K.surface2, borderRadius: 4, overflow: "hidden" }}>
+              <div style={{ width: `${pct}%`, height: "100%", background: K.orange, transition: "width 300ms ease-out" }} />
             </div>
-          ))}
+            <div style={{ ...T.small, color: K.text, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{doneCount}/{activeTpl.items.length}</div>
+          </div>
+        </div>
 
-          <button onClick={() => submit(activeTpl)} disabled={saving}
-            style={{ width: "100%", marginTop: 20, padding: "12px", borderRadius: 10, border: "none", background: saving ? "#555" : "linear-gradient(135deg, #34d399, #059669)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: saving ? 0.8 : 1 }}>
-            {saving ? "Salvando... (mantenha o app aberto)" : "Finalizar checklist"}
-          </button>
+        {/* Items list */}
+        <div style={{ maxWidth: 600, margin: "0 auto", padding: "12px 16px" }}>
+          {activeTpl.items.map((item, i) => {
+            const done = !!checked[i];
+            const photoTaken = (photos[i] || []).length > 0;
+            // Item "atual" = primeiro pendente (foco visual)
+            const firstPending = activeTpl.items.findIndex((_, idx) => !checked[idx]);
+            const isCurrent = !done && i === firstPending;
+            return (
+              <div key={i} style={{
+                display: "flex", alignItems: "flex-start", gap: 14,
+                padding: "14px 14px",
+                background: isCurrent ? `${K.orange}0F` : "transparent",
+                borderRadius: 12,
+                border: isCurrent ? `1px solid ${K.orange}55` : "1px solid transparent",
+                borderBottom: isCurrent ? `1px solid ${K.orange}55` : `1px solid ${K.border}`,
+                marginBottom: isCurrent ? 8 : 0,
+              }}>
+                <button
+                  onClick={() => setChecked(prev => ({ ...prev, [i]: !prev[i] }))}
+                  aria-label={done ? "Desmarcar" : "Marcar"}
+                  style={{
+                    width: 28, height: 28, borderRadius: 8,
+                    background: done ? K.green : isCurrent ? K.surface2 : "transparent",
+                    border: done ? `2px solid ${K.green}` : isCurrent ? `2px solid ${K.orange}` : `2px solid ${K.borderStrong}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0, marginTop: 1, cursor: "pointer",
+                    transition: "background 150ms ease, border-color 150ms ease",
+                  }}>
+                  {done && <Icon name="check-bold" size={18} color={K.black} />}
+                </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    ...T.body,
+                    color: done ? K.muted : K.text,
+                    fontWeight: isCurrent ? 600 : 400,
+                    textDecoration: done ? "line-through" : "none",
+                  }}>{item.text}</div>
+                  {item.requiresPhoto && (
+                    <div style={{ marginTop: 10 }}>
+                      {photoTaken ? (
+                        <>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                            {(photos[i] || []).map((photo, pi) => (
+                              <div key={pi} style={{ position: "relative" }}>
+                                <img src={photo} onClick={() => onPhotoClick(photo)}
+                                  style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 10, border: `1px solid ${K.border}`, cursor: "pointer" }} />
+                                <button onClick={() => removePhoto(i, pi)} aria-label="Remover foto"
+                                  style={{ position: "absolute", top: -6, right: -6, background: K.err, border: "none", borderRadius: "50%", width: 20, height: 20, color: K.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                  <Icon name="x" size={12} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          <button onClick={() => handlePhoto(i)}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: K.green, ...T.small, fontWeight: 700, cursor: "pointer", padding: 0 }}>
+                            <Icon name="check-circle" size={14} /> Foto enviada · adicionar mais
+                          </button>
+                        </>
+                      ) : (
+                        <button onClick={() => handlePhoto(i)} style={{
+                          height: 44, padding: "0 16px",
+                          background: K.surface2,
+                          border: `1px dashed ${K.borderStrong}`,
+                          borderRadius: 10,
+                          color: K.text,
+                          display: "inline-flex", alignItems: "center", gap: 8,
+                          fontFamily: FONT, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                        }}>
+                          <Icon name="camera" size={18} color={K.orange} /> Tirar foto obrigatória
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Sticky CTA */}
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10,
+          padding: "14px 16px calc(env(safe-area-inset-bottom, 14px) + 14px)",
+          background: `linear-gradient(to top, ${K.ink} 60%, ${K.ink}00)`,
+        }}>
+          <div style={{ maxWidth: 600, margin: "0 auto" }}>
+            <Btn size="xl" full kind="primary" icon="check-bold" loading={saving} onClick={() => submit(activeTpl)}>
+              {saving ? "Salvando — mantenha o app aberto" : "Finalizar checklist"}
+            </Btn>
+          </div>
         </div>
       </div>
     );
   }
 
+  // ── Home — lista de checklists por categoria ──
+  const totalItems = templates.reduce((acc, t) => acc + t.items.length, 0);
+  const totalDoneToday = completions.filter(c => c.date === today).reduce((acc, c) => acc + (c.items?.length || 0), 0);
+
   return (
-    <div className="anim" style={{ padding: "20px 28px", maxWidth: 800, margin: "0 auto" }}>
-      {templates.length === 0 && (
-        <div style={{ textAlign: "center", padding: "50px 20px" }}>
-          <div style={{ fontSize: 44, marginBottom: 12, opacity: 0.2 }}>📋</div>
-          <p style={{ fontSize: 14, color: "#555" }}>Nenhum checklist criado ainda</p>
-          <p style={{ fontSize: 12, color: "#333", marginTop: 4 }}>Peça ao administrador para criar checklists</p>
-        </div>
+    <div className="kuali-anim" style={{ padding: "16px 20px 40px", maxWidth: 720, margin: "0 auto", color: K.text, fontFamily: FONT }}>
+      {/* Top status row (online + pending) */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, ...T.small, color: K.text2 }}>
+          <StatusDot kind={isOnline ? "ok" : "warn"} size={7} />
+          {isOnline ? "Online" : "Offline"}
+          {pendingCount > 0 && <span style={{ color: K.yellow, fontWeight: 700 }}>· {pendingCount} na fila</span>}
+        </span>
+        <span style={{ ...T.caption, color: K.orange }}>{today}</span>
+      </div>
+
+      <div style={{ ...T.h1, color: K.text, marginBottom: 4 }}>Olá, {currentUser.name.split(" ")[0]}.</div>
+      <div style={{ ...T.body, color: K.text2, marginBottom: 18 }}>
+        {templates.length === 0 ? "Nenhum checklist criado ainda."
+          : `${grouped.reduce((a, g) => a + g.items.filter(t => !doneToday(t.id)).length, 0)} checklists pendentes hoje.`}
+      </div>
+
+      {/* Progress strip */}
+      {templates.length > 0 && (
+        <Card padding={14} style={{ marginBottom: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+            <span style={{ ...T.small, color: K.text2 }}>Progresso do dia</span>
+            <span style={{ ...T.small, color: K.text, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{totalDoneToday} / {totalItems}</span>
+          </div>
+          <div style={{ height: 6, background: K.surface2, borderRadius: 4, overflow: "hidden" }}>
+            <div style={{ width: totalItems ? `${Math.min(100, (totalDoneToday / totalItems) * 100)}%` : "0%", height: "100%", background: K.orange, borderRadius: 4, transition: "width 300ms ease-out" }} />
+          </div>
+        </Card>
       )}
-      {grouped.map(({ cat, items }) => (
-        <div key={cat} style={{ marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: CL_CAT_COLORS[cat], textTransform: "uppercase", letterSpacing: 1.5 }}>{cat}</span>
-            <span style={{ fontSize: 11, color: "#333" }}>({items.length})</span>
+
+      {templates.length === 0 && (
+        <Card padding={32} style={{ textAlign: "center" }}>
+          <div style={{ width: 48, height: 48, borderRadius: 14, background: K.surface2, color: K.muted, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+            <Icon name="list" size={24} />
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {items.map(t => {
-              const done = doneToday(t.id);
-              const doneBy = doneTodayBy(t.id);
-              return (
-                <div key={t.id} onClick={() => !done && startChecklist(t)}
-                  style={{ ...cardStyle, padding: "16px 18px", cursor: done ? "default" : "pointer", opacity: done ? 0.6 : 1, transition: "all 0.2s", display: "flex", alignItems: "center", gap: 14, borderColor: done ? "#13131e" : "#13131e" }}
-                  onMouseEnter={e => { if (!done) e.currentTarget.style.borderColor = "#2a2a3a"; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = "#13131e"; }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: done ? "#34d39920" : "#ffffff08", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
-                    {done ? "✅" : "📋"}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: done ? "#6ee7b7" : "#ddd" }}>{t.title}</div>
-                    <div style={{ fontSize: 11, color: "#555" }}>{t.items.length} itens{t.items.some(i => i.requiresPhoto) ? " · 📷 requer fotos" : ""}</div>
-                  </div>
-                  {done ? (
-                    <span style={{ fontSize: 11, color: "#6ee7b7", fontWeight: 500 }}>✓ {doneBy || "Feito hoje"}</span>
-                  ) : (
-                    <span style={{ fontSize: 11, color: "#555" }}>Pendente</span>
-                  )}
+          <div style={{ ...T.bodyB, color: K.text }}>Nenhum checklist criado ainda</div>
+          <div style={{ ...T.small, color: K.muted, marginTop: 4 }}>Peça ao administrador para criar checklists</div>
+        </Card>
+      )}
+
+      {grouped.length > 0 && <div style={{ ...T.caption, color: K.muted, marginBottom: 10 }}>CATEGORIAS</div>}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {grouped.map(({ cat, items }) => {
+          const color = CL_CAT_COLORS[cat] || K.muted;
+          const catIcon = CL_CAT_ICONS[cat] || "note";
+          const doneInCat = items.filter(t => doneToday(t.id)).length;
+          const allDone = doneInCat === items.length;
+          const pct = Math.round((doneInCat / items.length) * 100);
+          return (
+            <div key={cat}>
+              <div style={{
+                background: K.surface,
+                border: `1px solid ${K.border}`,
+                borderRadius: 14,
+                padding: 16,
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+                position: "relative",
+                overflow: "hidden",
+                marginBottom: 8,
+              }}>
+                <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: color }} />
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: `${color}1A`, display: "flex", alignItems: "center", justifyContent: "center", color, flexShrink: 0 }}>
+                  <Icon name={catIcon} size={22} />
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                    <div style={{ ...T.h3, color: K.text }}>{cat}</div>
+                    <div style={{ ...T.small, color: K.muted, fontVariantNumeric: "tabular-nums" }}>{doneInCat}/{items.length}</div>
+                  </div>
+                  <div style={{ ...T.small, color: K.text2, marginTop: 2 }}>{items.length === 1 ? "1 checklist" : `${items.length} checklists`}</div>
+                  <div style={{ height: 3, background: K.surface2, borderRadius: 2, marginTop: 10, overflow: "hidden" }}>
+                    <div style={{ width: `${pct}%`, height: "100%", background: allDone ? K.green : color, transition: "width 300ms ease-out" }} />
+                  </div>
+                </div>
+              </div>
+              {/* Templates dentro da categoria */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingLeft: 8 }}>
+                {items.map(t => {
+                  const done = doneToday(t.id);
+                  const doneBy = doneTodayBy(t.id);
+                  const hasPhoto = t.items.some(i => i.requiresPhoto);
+                  return (
+                    <div key={t.id} onClick={() => !done && startChecklist(t)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 12,
+                        padding: "12px 14px",
+                        background: K.surface2,
+                        border: `1px solid ${K.border}`,
+                        borderRadius: 10,
+                        cursor: done ? "default" : "pointer",
+                        opacity: done ? 0.65 : 1,
+                        transition: "border-color 150ms ease",
+                      }}
+                      onMouseEnter={e => { if (!done) e.currentTarget.style.borderColor = K.borderStrong; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = K.border; }}>
+                      <div style={{
+                        width: 24, height: 24, borderRadius: 6,
+                        background: done ? K.green : "transparent",
+                        border: done ? `2px solid ${K.green}` : `2px solid ${K.borderStrong}`,
+                        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                      }}>
+                        {done && <Icon name="check-bold" size={14} color={K.black} />}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ ...T.bodyB, color: done ? K.text2 : K.text, textDecoration: done ? "line-through" : "none" }}>{t.title}</div>
+                        <div style={{ ...T.small, color: K.muted, marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                          {t.items.length} itens
+                          {hasPhoto && <><span>·</span><Icon name="camera" size={12} color={K.muted} /> requer foto</>}
+                        </div>
+                      </div>
+                      {done ? (
+                        <span style={{ ...T.small, color: K.green, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          <Icon name="check-circle" size={14} /> {doneBy || "Feito"}
+                        </span>
+                      ) : (
+                        <Icon name="chevron-right" size={18} color={K.muted} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1400,49 +1632,56 @@ export default function App() {
   const hasFilters = period !== "all" || selectedCats.length > 0 || searchText || dateFrom || dateTo;
 
   const mainTab = (active) => ({
-    flex: 1, padding: "12px 0", border: "none", borderBottom: active ? "2px solid #34d399" : "2px solid transparent",
-    background: "transparent", color: active ? "#6ee7b7" : "#555", fontSize: 14, fontWeight: 600,
-    cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s",
+    flex: 1, padding: "14px 0", border: "none",
+    borderBottom: active ? `2px solid ${K.orange}` : "2px solid transparent",
+    background: "transparent", color: active ? K.text : K.muted,
+    fontSize: 14, fontWeight: active ? 700 : 500,
+    cursor: "pointer", fontFamily: FONT, transition: "all 150ms ease",
+    display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
+    letterSpacing: "-0.005em",
   });
   const subTab = (active) => ({
-    padding: "5px 14px", borderRadius: 8, border: "1px solid",
-    borderColor: active ? "#ffffff18" : "transparent", background: active ? "#ffffff08" : "transparent",
-    color: active ? "#ddd" : "#555", fontSize: 12, fontWeight: 500,
-    cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s", whiteSpace: "nowrap",
+    padding: "7px 14px", borderRadius: 8, border: "1px solid",
+    borderColor: active ? K.border : "transparent",
+    background: active ? K.surface2 : "transparent",
+    color: active ? K.text : K.text2,
+    fontSize: 13, fontWeight: active ? 600 : 500,
+    cursor: "pointer", fontFamily: FONT, transition: "all 150ms ease", whiteSpace: "nowrap",
   });
 
   return (
-    <div style={{ minHeight: "100vh", background: "#08080c", fontFamily: "'Inter', system-ui, sans-serif", color: "#d4d4d4" }}>
+    <div style={{ minHeight: "100vh", background: K.ink, fontFamily: FONT, color: K.text }}>
       <style>{CSS}</style>
 
       {/* HEADER */}
-      <div style={{ background: "#0c0c14", borderBottom: "1px solid #13131e" }}>
-        <div style={{ padding: "18px 28px 0" }}>
+      <div style={{ background: K.surface, borderBottom: `1px solid ${K.border}` }}>
+        <div style={{ padding: "16px 28px 0", maxWidth: 1400, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 11, background: "linear-gradient(135deg, #6ee7b7 0%, #059669 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#064e36", boxShadow: "0 0 24px #34d39918" }}>K</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "#fff", letterSpacing: "-0.5px" }}>Controle Kuali</div>
-              <div style={{ fontSize: 10, color: "#4a4a5a", letterSpacing: 2 }}>{currentUser.name} · {currentUser.role}{isAdmin ? " · Admin" : ""}</div>
+            <KualiMark size={32} />
+            <div style={{ flex: 1, display: "flex", alignItems: "baseline", gap: 12 }}>
+              <KualiLogo size={22} />
+              <span style={{ ...T.small, color: K.muted }}>{currentUser.name} · {currentUser.role}{isAdmin ? " · Admin" : ""}</span>
             </div>
-            <button onClick={() => setShowReminders(true)} title="Lembretes" style={{ position: "relative", background: "none", border: "1px solid #1e1e2e", borderRadius: 10, padding: "7px 11px", cursor: "pointer", fontSize: 16 }}>
-              🔔
+            <button onClick={() => setShowReminders(true)} title="Lembretes"
+              style={{ position: "relative", background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 10, width: 40, height: 40, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: K.text2 }}>
+              <Icon name="bell" size={18} />
               {reminders.length > 0 && (
-                <span style={{ position: "absolute", top: -5, right: -5, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{reminders.length}</span>
+                <span style={{ position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: K.orange, color: K.black, fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT }}>{reminders.length}</span>
               )}
             </button>
-            <button onClick={() => setCurrentUser(null)} style={{ ...actionBtn("#ef4444"), fontSize: 11, padding: "6px 14px" }}>Sair</button>
+            <Btn kind="secondary" size="sm" icon="signout" onClick={() => setCurrentUser(null)}>Sair</Btn>
           </div>
           <div style={{ display: "flex" }}>
-            {isAdmin && <button onClick={() => setSection("compras")} style={mainTab(section === "compras")}>🧾 Compras</button>}
-            <button onClick={() => setSection("checklists")} style={mainTab(section === "checklists")}>📋 Check-Lists</button>
-            <button onClick={() => setSection("producao")} style={mainTab(section === "producao")}>🏭 Produção</button>
-            <button onClick={() => setSection("funcionarios")} style={mainTab(section === "funcionarios")}>👥 Funcionários</button>
+            {isAdmin && <button onClick={() => setSection("compras")} style={mainTab(section === "compras")}><Icon name="receipt" size={16} color={section === "compras" ? K.orange : K.muted} /> Compras</button>}
+            <button onClick={() => setSection("checklists")} style={mainTab(section === "checklists")}><Icon name="list" size={16} color={section === "checklists" ? K.orange : K.muted} /> Check-Lists</button>
+            <button onClick={() => setSection("producao")} style={mainTab(section === "producao")}><Icon name="box" size={16} color={section === "producao" ? K.orange : K.muted} /> Produção</button>
+            <button onClick={() => setSection("funcionarios")} style={mainTab(section === "funcionarios")}><Icon name="user" size={16} color={section === "funcionarios" ? K.orange : K.muted} /> Funcionários</button>
           </div>
         </div>
       </div>
 
       {/* SUB-NAVIGATION */}
-      <div style={{ padding: "10px 28px", borderBottom: "1px solid #13131e", display: "flex", gap: 6, alignItems: "center" }}>
+      <div style={{ padding: "12px 28px", borderBottom: `1px solid ${K.border}`, display: "flex", gap: 6, alignItems: "center", maxWidth: 1400, margin: "0 auto", width: "100%" }}>
         {section === "compras" && isAdmin && (
           <>
             <button onClick={() => setComprasTab("notas")} style={subTab(comprasTab === "notas")}>Notas fiscais</button>
@@ -1476,160 +1715,369 @@ export default function App() {
       {/* TAB: COMPRAS */}
       {isAdmin && section === "compras" && comprasTab === "produtos" && <CatalogView catalog={catalog} onAdd={addCatalogItem} onUpdate={updateCatalogItem} onRemove={removeCatalogItem} />}
       {isAdmin && section === "compras" && (comprasTab === "notas" || comprasTab === "resumo") && (
-        <>
-          {items.length > 0 && (
-            <div style={{ padding: "14px 28px", borderBottom: "1px solid #13131e" }}>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
-                <span style={{ fontSize: 10, color: "#3a3a4a", marginRight: 6, textTransform: "uppercase", letterSpacing: 2, fontWeight: 600 }}>Período</span>
-                {PERIODS.map(p => (<button key={p.key} onClick={() => setPeriod(p.key)} style={pill(period === p.key, p.key === "custom" ? "#fbbf24" : "#6ee7b7")}>{p.key === "custom" ? "📅 " : ""}{p.label}</button>))}
-                {period === "custom" && (<><span style={{ color: "#444", fontSize: 12 }}>de</span><input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ ...inputBase, colorScheme: "dark", fontSize: 12 }} /><span style={{ color: "#444", fontSize: 12 }}>até</span><input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ ...inputBase, colorScheme: "dark", fontSize: 12 }} /></>)}
-              </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                <span style={{ fontSize: 10, color: "#3a3a4a", marginRight: 6, textTransform: "uppercase", letterSpacing: 2, fontWeight: 600 }}>Categorias</span>
-                <button onClick={() => toggleCat("__all__")} style={pill(selectedCats.length === 0, "#6ee7b7")}>Todas</button>
-                {CATEGORIES.map(c => { const count = catCounts[c] || 0; if (!count) return null; return (<button key={c} onClick={() => toggleCat(c)} style={pill(selectedCats.includes(c), CAT_COLOR[c])}><span style={{ fontSize: 13 }}>{CAT_ICON[c]}</span> {c} <span style={{ opacity: 0.55, fontSize: 10 }}>({count})</span></button>); })}
-                {hasFilters && <button onClick={() => { setSelectedCats([]); setPeriod("all"); setDateFrom(""); setDateTo(""); setSearchText(""); }} style={{ ...pill(false, "#888"), color: "#666", fontSize: 11 }}>✕ Limpar</button>}
+        <div className="kuali-anim" style={{ maxWidth: 1400, margin: "0 auto" }}>
+          {/* Page header */}
+          <div style={{ padding: "24px 28px 20px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ ...T.caption, color: K.orange }}>COMPRAS</div>
+              <div style={{ ...T.h1, color: K.text, marginTop: 6, fontSize: 28 }}>{comprasTab === "notas" ? "Notas fiscais" : "Resumo do período"}</div>
+              <div style={{ ...T.body, color: K.text2, marginTop: 4 }}>
+                {filteredItems.length} {filteredItems.length === 1 ? "item" : "itens"}
+                {filteredItems.length > 0 && <> · <span style={{ ...T.mono, color: K.text }}>{formatBRL(totalGeral)}</span></>}
               </div>
             </div>
+            {filteredItems.length > 0 && comprasTab === "notas" && (
+              <div style={{ display: "flex", gap: 10 }}>
+                <Btn kind="secondary" icon="upload" onClick={() => downloadCSV(filteredItems)}>Exportar CSV</Btn>
+                <Btn kind="primary" icon="upload" onClick={() => fileRef.current?.click()}>Lançar nota</Btn>
+              </div>
+            )}
+          </div>
+
+          {/* Filters */}
+          {items.length > 0 && (
+            <div style={{ padding: "0 28px 14px" }}>
+              <Card padding={16}>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
+                  <span style={{ ...T.caption, color: K.muted, marginRight: 6 }}>Período</span>
+                  {PERIODS.map(p => {
+                    const active = period === p.key;
+                    return (
+                      <button key={p.key} onClick={() => setPeriod(p.key)}
+                        style={{
+                          padding: "6px 12px", borderRadius: 9999,
+                          border: `1px solid ${active ? K.orange : K.border}`,
+                          background: active ? `${K.orange}1A` : "transparent",
+                          color: active ? K.orange : K.text2,
+                          fontSize: 12, fontFamily: FONT, fontWeight: 600,
+                          cursor: "pointer", whiteSpace: "nowrap",
+                        }}>{p.label}</button>
+                    );
+                  })}
+                  {period === "custom" && (
+                    <>
+                      <span style={{ ...T.small, color: K.muted }}>de</span>
+                      <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                        style={{ background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 8, padding: "5px 10px", color: K.text, fontFamily: FONT, fontSize: 12, colorScheme: "dark" }} />
+                      <span style={{ ...T.small, color: K.muted }}>até</span>
+                      <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                        style={{ background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 8, padding: "5px 10px", color: K.text, fontFamily: FONT, fontSize: 12, colorScheme: "dark" }} />
+                    </>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  <span style={{ ...T.caption, color: K.muted, marginRight: 6 }}>Categorias</span>
+                  <button onClick={() => toggleCat("__all__")}
+                    style={{
+                      padding: "6px 12px", borderRadius: 9999,
+                      border: `1px solid ${selectedCats.length === 0 ? K.orange : K.border}`,
+                      background: selectedCats.length === 0 ? `${K.orange}1A` : "transparent",
+                      color: selectedCats.length === 0 ? K.orange : K.text2,
+                      fontSize: 12, fontFamily: FONT, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+                    }}>Todas</button>
+                  {CATEGORIES.map(c => {
+                    const count = catCounts[c] || 0;
+                    if (!count) return null;
+                    const active = selectedCats.includes(c);
+                    const color = CAT_COLOR[c];
+                    return (
+                      <button key={c} onClick={() => toggleCat(c)}
+                        style={{
+                          padding: "6px 12px", borderRadius: 9999,
+                          border: `1px solid ${active ? color : K.border}`,
+                          background: active ? `${color}1A` : "transparent",
+                          color: active ? color : K.text2,
+                          fontSize: 12, fontFamily: FONT, fontWeight: 600,
+                          cursor: "pointer", whiteSpace: "nowrap",
+                          display: "inline-flex", alignItems: "center", gap: 6,
+                        }}>
+                        <Icon name={CAT_ICON[c]} size={12} color={active ? color : K.muted} />
+                        {c} <span style={{ opacity: 0.6, ...T.mono, fontSize: 11 }}>({count})</span>
+                      </button>
+                    );
+                  })}
+                  {hasFilters && (
+                    <button onClick={() => { setSelectedCats([]); setPeriod("all"); setDateFrom(""); setDateTo(""); setSearchText(""); }}
+                      style={{ padding: "6px 12px", borderRadius: 9999, border: `1px solid ${K.border}`, background: "transparent", color: K.muted, fontSize: 11, fontFamily: FONT, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <Icon name="x" size={12} /> Limpar
+                    </button>
+                  )}
+                </div>
+              </Card>
+            </div>
           )}
+
+          {/* Stat cards */}
           {filteredItems.length > 0 && (
-            <div className="anim" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, padding: "16px 28px" }}>
-              {[{ label: "Total gasto", value: formatBRL(totalGeral), color: "#6ee7b7" }, { label: "Itens", value: filteredItems.length, color: "#38bdf8" }, { label: "Categorias", value: Object.keys(categoryTotals).length, color: "#c084fc" }, { label: "Fornecedores", value: [...new Set(filteredItems.map(i => i.supplier).filter(Boolean))].length, color: "#fbbf24" }].map(s => (
-                <div key={s.label} style={cardStyle}><div style={{ fontSize: 10, color: "#4a4a5a", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6 }}>{s.label}</div><div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div></div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, padding: "8px 28px 14px" }}>
+              {[
+                { label: "TOTAL GASTO", value: formatBRL(totalGeral), mono: true },
+                { label: "ITENS", value: filteredItems.length, mono: true },
+                { label: "CATEGORIAS", value: Object.keys(categoryTotals).length, mono: true },
+                { label: "FORNECEDORES", value: [...new Set(filteredItems.map(i => i.supplier).filter(Boolean))].length, mono: true },
+              ].map(s => (
+                <Card key={s.label} padding={18}>
+                  <div style={{ ...T.caption, color: K.muted }}>{s.label}</div>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: K.text, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums", marginTop: 8, fontFamily: s.mono ? MONO : FONT }}>{s.value}</div>
+                </Card>
               ))}
             </div>
           )}
-          <div style={{ padding: "0 28px 32px", maxWidth: 1020, margin: "0 auto" }}>
+
+          <div style={{ padding: "0 28px 32px" }}>
+            {/* Drop zone (Claude AI) */}
             {comprasTab === "notas" && (
-              <div onDragOver={e => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={onDrop} onClick={() => !processing && fileRef.current?.click()}
-                style={{ border: `2px dashed ${dragOver ? "#34d399" : "#1a1a28"}`, borderRadius: 16, padding: processing ? "16px" : "30px 20px", textAlign: "center", cursor: processing ? "default" : "pointer", background: dragOver ? "#34d39906" : "#0a0a12", marginBottom: 16, marginTop: 8 }}>
-                <input ref={fileRef} type="file" multiple accept="image/*" style={{ display: "none" }} onChange={e => processFiles(e.target.files)} />
-                {processing ? (<div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}><div style={{ width: 16, height: 16, border: "2px solid #34d399", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} /><span style={{ color: "#6ee7b7", fontSize: 13, fontWeight: 500 }}>Analisando nota {processedCount + 1} de {totalToProcess}...</span></div>
-                ) : (<><div style={{ fontSize: 28, marginBottom: 6, opacity: 0.4 }}>📸</div><p style={{ fontSize: 13, fontWeight: 500, color: "#888" }}>Arraste fotos de notas fiscais aqui</p><p style={{ fontSize: 11, color: "#3a3a4a" }}>ou clique para selecionar{catalog.length > 0 ? ` · ${catalog.length} produtos no catálogo` : ""}</p></>)}
+              <Card padding={0} style={{ marginBottom: 16, marginTop: 4, overflow: "hidden" }}>
+                <div style={{ padding: "16px 20px", borderBottom: `1px solid ${K.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <Icon name="sparkle" size={18} color={K.orange} />
+                    <div>
+                      <div style={{ ...T.caption, color: K.muted }}>IA · NF AUTO-IMPORT</div>
+                      <div style={{ ...T.h3, color: K.text, marginTop: 2 }}>Upload com Claude</div>
+                    </div>
+                  </div>
+                  <Chip icon="sparkle" color={K.orange} bg={`${K.orange}22`}>Beta</Chip>
+                </div>
+                <div onDragOver={e => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={onDrop} onClick={() => !processing && fileRef.current?.click()}
+                  style={{
+                    margin: 16,
+                    border: `1.5px dashed ${dragOver ? K.orange : K.borderStrong}`,
+                    borderRadius: 12,
+                    padding: processing ? 16 : 28,
+                    textAlign: "center",
+                    cursor: processing ? "default" : "pointer",
+                    background: dragOver ? `${K.orange}0D` : K.surface2,
+                    transition: "all 150ms ease",
+                  }}>
+                  <input ref={fileRef} type="file" multiple accept="image/*" style={{ display: "none" }} onChange={e => processFiles(e.target.files)} />
+                  {processing ? (
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
+                      <Icon name="spinner" size={18} color={K.orange} spin />
+                      <span style={{ ...T.body, color: K.text, fontWeight: 600 }}>Analisando nota {processedCount + 1} de {totalToProcess}…</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ width: 52, height: 52, borderRadius: 14, background: `${K.orange}1A`, color: K.orange, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                        <Icon name="upload" size={24} />
+                      </div>
+                      <div style={{ ...T.bodyB, color: K.text }}>Solte a foto da NF aqui</div>
+                      <div style={{ ...T.small, color: K.muted, marginTop: 4 }}>
+                        Itens, fornecedor e total extraídos automaticamente{catalog.length > 0 ? ` · ${catalog.length} produtos no catálogo` : ""}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </Card>
+            )}
+
+            {error && (
+              <div style={{ padding: "12px 14px", borderRadius: 10, background: `${K.err}1A`, border: `1px solid ${K.err}55`, color: K.err, ...T.small, fontWeight: 600, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+                <Icon name="alert" size={16} /> {error}
               </div>
             )}
-            {error && <div style={{ padding: "10px 14px", borderRadius: 8, background: "#ef444412", border: "1px solid #ef444425", color: "#fca5a5", fontSize: 12, marginBottom: 14 }}>{error}</div>}
 
             {/* Manual entry */}
             <div style={{ marginBottom: 14 }}>
-              <button onClick={() => setShowManual(!showManual)} style={{ ...actionBtn(showManual ? "#34d399" : "#555"), display: "flex", alignItems: "center", gap: 6 }}>
-                {showManual ? "✕ Fechar" : "+ Adicionar nota manualmente"}
-              </button>
+              <Btn kind={showManual ? "secondary" : "ghost"} size="sm" icon={showManual ? "x" : "plus"} onClick={() => setShowManual(!showManual)}>
+                {showManual ? "Fechar" : "Adicionar nota manualmente"}
+              </Btn>
               {showManual && (
-                <div className="anim" style={{ ...cardStyle, marginTop: 10, padding: 18 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#ccc", marginBottom: 14 }}>Adicionar item manualmente</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 14 }}>
-                    <div style={{ gridColumn: "span 2" }}>
-                      <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Produto *</label>
-                      <input value={manualForm.product} onChange={e => setManualForm({ ...manualForm, product: e.target.value })} placeholder="Ex: Frango" style={{ ...inputBase, width: "100%" }} />
-                    </div>
+                <Card padding={20} style={{ marginTop: 10 }} className="kuali-anim">
+                  <div style={{ ...T.h3, color: K.text, marginBottom: 14 }}>Adicionar item manualmente</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 14 }}>
+                    {[
+                      { key: "product", label: "Produto *", placeholder: "Ex: Frango", colSpan: 2 },
+                      { key: "totalPrice", label: "Valor total (R$) *", placeholder: "0.00", type: "number", step: "0.01" },
+                      { key: "quantity", label: "Quantidade", placeholder: "1", type: "number" },
+                    ].map(f => (
+                      <div key={f.key} style={f.colSpan ? { gridColumn: `span ${f.colSpan}` } : undefined}>
+                        <label style={{ ...T.caption, color: K.muted, display: "block", marginBottom: 6 }}>{f.label}</label>
+                        <input type={f.type} step={f.step} value={manualForm[f.key]} onChange={e => setManualForm({ ...manualForm, [f.key]: e.target.value })} placeholder={f.placeholder}
+                          style={{ width: "100%", background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 8, padding: "9px 12px", color: K.text, fontFamily: FONT, fontSize: 14 }} />
+                      </div>
+                    ))}
                     <div>
-                      <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Valor total (R$) *</label>
-                      <input type="number" step="0.01" value={manualForm.totalPrice} onChange={e => setManualForm({ ...manualForm, totalPrice: e.target.value })} placeholder="0.00" style={{ ...inputBase, width: "100%" }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Quantidade</label>
-                      <input type="number" value={manualForm.quantity} onChange={e => setManualForm({ ...manualForm, quantity: e.target.value })} placeholder="1" style={{ ...inputBase, width: "100%" }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Unidade</label>
-                      <select value={manualForm.unit} onChange={e => setManualForm({ ...manualForm, unit: e.target.value })} style={{ ...inputBase, width: "100%" }}>
+                      <label style={{ ...T.caption, color: K.muted, display: "block", marginBottom: 6 }}>Unidade</label>
+                      <select value={manualForm.unit} onChange={e => setManualForm({ ...manualForm, unit: e.target.value })}
+                        style={{ width: "100%", background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 8, padding: "9px 12px", color: K.text, fontFamily: FONT, fontSize: 14 }}>
                         <option value="">—</option><option>kg</option><option>un</option><option>L</option><option>cx</option><option>pc</option>
                       </select>
                     </div>
                     <div>
-                      <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Categoria</label>
-                      <select value={manualForm.category} onChange={e => setManualForm({ ...manualForm, category: e.target.value })} style={{ ...inputBase, width: "100%" }}>
-                        {CATEGORIES.map(c => <option key={c} value={c}>{CAT_ICON[c]} {c}</option>)}
+                      <label style={{ ...T.caption, color: K.muted, display: "block", marginBottom: 6 }}>Categoria</label>
+                      <select value={manualForm.category} onChange={e => setManualForm({ ...manualForm, category: e.target.value })}
+                        style={{ width: "100%", background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 8, padding: "9px 12px", color: K.text, fontFamily: FONT, fontSize: 14 }}>
+                        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Fornecedor</label>
-                      <input value={manualForm.supplier} onChange={e => setManualForm({ ...manualForm, supplier: e.target.value })} placeholder="Ex: Atacadão" style={{ ...inputBase, width: "100%" }} />
+                      <label style={{ ...T.caption, color: K.muted, display: "block", marginBottom: 6 }}>Fornecedor</label>
+                      <input value={manualForm.supplier} onChange={e => setManualForm({ ...manualForm, supplier: e.target.value })} placeholder="Ex: Atacadão"
+                        style={{ width: "100%", background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 8, padding: "9px 12px", color: K.text, fontFamily: FONT, fontSize: 14 }} />
                     </div>
                     <div>
-                      <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Data</label>
-                      <input type="date" value={manualForm.date} onChange={e => setManualForm({ ...manualForm, date: e.target.value })} style={{ ...inputBase, width: "100%", colorScheme: "dark" }} />
+                      <label style={{ ...T.caption, color: K.muted, display: "block", marginBottom: 6 }}>Data</label>
+                      <input type="date" value={manualForm.date} onChange={e => setManualForm({ ...manualForm, date: e.target.value })}
+                        style={{ width: "100%", background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 8, padding: "9px 12px", color: K.text, fontFamily: FONT, fontSize: 14, colorScheme: "dark" }} />
                     </div>
                   </div>
-                  <button onClick={addManualItem} style={{ ...actionBtn("#34d399"), fontWeight: 600 }}>Adicionar item</button>
-                </div>
+                  <Btn kind="primary" icon="plus" onClick={addManualItem}>Adicionar item</Btn>
+                </Card>
               )}
             </div>
 
             {filteredItems.length > 0 && comprasTab === "notas" && (
-              <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-                <button onClick={() => downloadCSV(filteredItems)} style={actionBtn("#38bdf8")}>↓ Exportar CSV</button>
-                <button onClick={() => { clearItems(); setSelectedCats([]); setPeriod("all"); setSearchText(""); }} style={actionBtn("#ef4444")}>✕ Limpar</button>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 14 }}>
+                <Btn kind="ghost" size="sm" icon="trash" onClick={() => { clearItems(); setSelectedCats([]); setPeriod("all"); setSearchText(""); }} style={{ color: K.err }}>Limpar tudo</Btn>
               </div>
             )}
+
+            {/* Table */}
             {filteredItems.length > 0 && comprasTab === "notas" && (
-              <div className="anim" style={{ background: "#0a0a12", borderRadius: 14, border: "1px solid #13131e", overflow: "hidden" }}>
+              <Card padding={0} style={{ overflow: "hidden" }} className="kuali-anim">
+                <div style={{ padding: "14px 20px", borderBottom: `1px solid ${K.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                  <div style={{ ...T.h3, color: K.text }}>Últimas notas</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, background: K.surface2, padding: "8px 12px", borderRadius: 10, border: `1px solid ${K.border}`, minWidth: 240, maxWidth: 320, flex: 1 }}>
+                    <Icon name="search" size={16} color={K.muted} />
+                    <input value={searchText} onChange={e => setSearchText(e.target.value)} placeholder="Buscar fornecedor, produto…"
+                      style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: K.text, fontFamily: FONT, fontSize: 13 }} />
+                  </div>
+                </div>
                 <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                    <thead><tr style={{ borderBottom: "1px solid #13131e" }}>{["Data", "Produto", "Nota", "Qtd", "Total", "Categoria", "Fornecedor", ""].map(h => (<th key={h} style={{ padding: "12px 10px", textAlign: "left", color: "#3a3a4a", fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, whiteSpace: "nowrap" }}>{h}</th>))}</tr></thead>
-                    <tbody>{pagedItems.map((item, idx) => {
-                      const realIdx = items.indexOf(item); const isEd = editingIdx === realIdx; const nc = item.originalName && item.originalName.toLowerCase() !== item.product.toLowerCase(); return (
-                        <tr key={item.id} style={{ borderBottom: "1px solid #0d0d16", background: isEd ? "#34d39906" : "transparent" }} onMouseEnter={e => { if (!isEd) e.currentTarget.style.background = "#ffffff03"; }} onMouseLeave={e => { if (!isEd) e.currentTarget.style.background = "transparent"; }}>
-                          {isEd ? (<>
-                            <td style={{ padding: "8px 10px" }}><input value={editForm.date || ""} onChange={e => setEditForm({ ...editForm, date: e.target.value })} style={{ ...inputBase, width: 90, fontSize: 12 }} /></td>
-                            <td style={{ padding: "8px 10px" }}><input value={editForm.product} onChange={e => setEditForm({ ...editForm, product: e.target.value })} style={{ ...inputBase, width: "100%", fontSize: 12 }} /></td>
-                            <td style={{ padding: "8px 6px", color: "#444", fontSize: 11 }}>{editForm.originalName || "—"}</td>
-                            <td style={{ padding: "8px 6px" }}><input value={editForm.quantity || ""} onChange={e => setEditForm({ ...editForm, quantity: e.target.value })} style={{ ...inputBase, width: 50, fontSize: 12 }} /></td>
-                            <td style={{ padding: "8px 6px" }}><input value={editForm.totalPrice} onChange={e => setEditForm({ ...editForm, totalPrice: e.target.value })} style={{ ...inputBase, width: 80, fontSize: 12, color: "#6ee7b7" }} /></td>
-                            <td style={{ padding: "8px 6px" }}><select value={editForm.category} onChange={e => setEditForm({ ...editForm, category: e.target.value })} style={{ ...inputBase, fontSize: 11 }}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></td>
-                            <td style={{ padding: "8px 6px" }}><input value={editForm.supplier || ""} onChange={e => setEditForm({ ...editForm, supplier: e.target.value })} style={{ ...inputBase, width: 90, fontSize: 12 }} /></td>
-                            <td style={{ padding: "8px 8px", whiteSpace: "nowrap" }}><button onClick={saveEdit} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13 }}>✅</button><button onClick={() => setEditingIdx(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13 }}>❌</button></td>
-                          </>) : (<>
-                            <td style={{ padding: "10px 10px", color: "#777", fontSize: 11, whiteSpace: "nowrap" }}>{formatDateBR(item.isoDate)}</td>
-                            <td style={{ padding: "10px 10px" }}><span style={{ color: "#ddd", fontWeight: 500 }}>{item.product}</span>{item.matched && <span style={{ marginLeft: 6, fontSize: 9, padding: "1px 6px", borderRadius: 8, background: "#34d39918", color: "#6ee7b7", border: "1px solid #34d39930" }}>catálogo</span>}</td>
-                            <td style={{ padding: "10px 6px", color: nc ? "#666" : "#333", fontSize: 11, fontStyle: nc ? "italic" : "normal" }}>{nc ? item.originalName : "—"}</td>
-                            <td style={{ padding: "10px 6px", color: "#666" }}>{item.quantity}{item.unit ? ` ${item.unit}` : ""}</td>
-                            <td style={{ padding: "10px 6px", color: "#6ee7b7", fontWeight: 600 }}>{formatBRL(item.totalPrice)}</td>
-                            <td style={{ padding: "10px 6px" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 9px", borderRadius: 12, fontSize: 10, fontWeight: 500, background: (CAT_COLOR[item.category] || "#666") + "14", color: CAT_COLOR[item.category] || "#888", border: `1px solid ${(CAT_COLOR[item.category] || "#666")}22` }}>{CAT_ICON[item.category]} {item.category}</span></td>
-                            <td style={{ padding: "10px 6px", color: "#4a4a5a", fontSize: 11 }}>{item.supplier || "—"}</td>
-                            <td style={{ padding: "10px 8px", whiteSpace: "nowrap" }}>
-                              <button onClick={() => startEdit(item)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, opacity: 0.35 }} onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = 0.35}>✏️</button>
-                              <button onClick={() => deleteItem(item)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, opacity: 0.35 }} onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = 0.35}>🗑️</button>
-                            </td>
-                          </>)}
-                        </tr>);
-                    })}</tbody>
-                    <tfoot><tr style={{ borderTop: "2px solid #13131e" }}><td colSpan={4} style={{ padding: "14px 10px", fontWeight: 700, color: "#555", textTransform: "uppercase", fontSize: 10, letterSpacing: 1.5 }}>Total ({filteredItems.length})</td><td style={{ padding: "14px 6px", fontWeight: 700, color: "#6ee7b7", fontSize: 16 }}>{formatBRL(totalGeral)}</td><td colSpan={3} /></tr></tfoot>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: FONT }}>
+                    <thead>
+                      <tr style={{ background: K.surface2 }}>
+                        {["DATA", "PRODUTO", "ORIGINAL", "QTD", "TOTAL", "CATEGORIA", "FORNECEDOR", ""].map(h => (
+                          <th key={h} style={{ ...T.caption, color: K.muted, padding: "12px 12px", textAlign: h === "TOTAL" ? "right" : "left", whiteSpace: "nowrap", borderBottom: `1px solid ${K.border}` }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedItems.map((item) => {
+                        const realIdx = items.indexOf(item);
+                        const isEd = editingIdx === realIdx;
+                        const nc = item.originalName && item.originalName.toLowerCase() !== item.product.toLowerCase();
+                        const catColor = CAT_COLOR[item.category] || K.muted;
+                        return (
+                          <tr key={item.id}
+                            style={{ borderBottom: `1px solid ${K.border}`, background: isEd ? `${K.orange}0D` : "transparent", transition: "background 100ms ease" }}
+                            onMouseEnter={e => { if (!isEd) e.currentTarget.style.background = `${K.surface2}80`; }}
+                            onMouseLeave={e => { if (!isEd) e.currentTarget.style.background = "transparent"; }}>
+                            {isEd ? (
+                              <>
+                                <td style={{ padding: "8px 10px" }}><input value={editForm.date || ""} onChange={e => setEditForm({ ...editForm, date: e.target.value })} style={{ width: 100, background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 6, padding: "6px 8px", color: K.text, fontSize: 13, fontFamily: FONT }} /></td>
+                                <td style={{ padding: "8px 10px" }}><input value={editForm.product} onChange={e => setEditForm({ ...editForm, product: e.target.value })} style={{ width: "100%", background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 6, padding: "6px 8px", color: K.text, fontSize: 13, fontFamily: FONT }} /></td>
+                                <td style={{ padding: "8px 6px", color: K.muted, fontSize: 12 }}>{editForm.originalName || "—"}</td>
+                                <td style={{ padding: "8px 6px" }}><input value={editForm.quantity || ""} onChange={e => setEditForm({ ...editForm, quantity: e.target.value })} style={{ width: 60, background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 6, padding: "6px 8px", color: K.text, fontSize: 13, fontFamily: FONT }} /></td>
+                                <td style={{ padding: "8px 6px" }}><input value={editForm.totalPrice} onChange={e => setEditForm({ ...editForm, totalPrice: e.target.value })} style={{ width: 90, background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 6, padding: "6px 8px", color: K.text, fontSize: 13, fontFamily: MONO }} /></td>
+                                <td style={{ padding: "8px 6px" }}>
+                                  <select value={editForm.category} onChange={e => setEditForm({ ...editForm, category: e.target.value })} style={{ background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 6, padding: "6px 8px", color: K.text, fontSize: 12, fontFamily: FONT }}>
+                                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                  </select>
+                                </td>
+                                <td style={{ padding: "8px 6px" }}><input value={editForm.supplier || ""} onChange={e => setEditForm({ ...editForm, supplier: e.target.value })} style={{ width: 110, background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 6, padding: "6px 8px", color: K.text, fontSize: 13, fontFamily: FONT }} /></td>
+                                <td style={{ padding: "8px 8px", whiteSpace: "nowrap", display: "flex", gap: 4 }}>
+                                  <button onClick={saveEdit} title="Salvar" style={{ background: "transparent", border: "none", cursor: "pointer", color: K.green, padding: 4 }}><Icon name="check" size={18} /></button>
+                                  <button onClick={() => setEditingIdx(null)} title="Cancelar" style={{ background: "transparent", border: "none", cursor: "pointer", color: K.muted, padding: 4 }}><Icon name="x" size={18} /></button>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td style={{ padding: "12px 12px", color: K.muted, fontFamily: MONO, fontSize: 12, whiteSpace: "nowrap" }}>{formatDateBR(item.isoDate)}</td>
+                                <td style={{ padding: "12px 12px" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                    <span style={{ ...T.bodyB, color: K.text, fontSize: 14 }}>{item.product}</span>
+                                    {item.matched && <Chip color={K.green} bg={`${K.green}1A`}>catálogo</Chip>}
+                                  </div>
+                                </td>
+                                <td style={{ padding: "12px 12px", color: nc ? K.muted : K.borderStrong, fontSize: 12, fontStyle: nc ? "italic" : "normal" }}>{nc ? item.originalName : "—"}</td>
+                                <td style={{ padding: "12px 12px", color: K.text2, fontFamily: MONO, fontSize: 13 }}>{item.quantity}{item.unit ? ` ${item.unit}` : ""}</td>
+                                <td style={{ padding: "12px 12px", color: K.text, fontFamily: MONO, fontSize: 14, fontWeight: 700, fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{formatBRL(item.totalPrice)}</td>
+                                <td style={{ padding: "12px 12px" }}>
+                                  <Chip icon={CAT_ICON[item.category]} color={catColor} bg={`${catColor}1A`}>{item.category}</Chip>
+                                </td>
+                                <td style={{ padding: "12px 12px", color: K.text2, fontSize: 13 }}>{item.supplier || "—"}</td>
+                                <td style={{ padding: "12px 12px", whiteSpace: "nowrap" }}>
+                                  <button onClick={() => startEdit(item)} title="Editar" style={{ background: "transparent", border: "none", cursor: "pointer", color: K.muted, padding: 6 }} onMouseEnter={e => e.currentTarget.style.color = K.text} onMouseLeave={e => e.currentTarget.style.color = K.muted}><Icon name="edit" size={16} /></button>
+                                  <button onClick={() => deleteItem(item)} title="Apagar" style={{ background: "transparent", border: "none", cursor: "pointer", color: K.muted, padding: 6 }} onMouseEnter={e => e.currentTarget.style.color = K.err} onMouseLeave={e => e.currentTarget.style.color = K.muted}><Icon name="trash" size={16} /></button>
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ borderTop: `2px solid ${K.border}`, background: K.surface2 }}>
+                        <td colSpan={4} style={{ padding: "14px 12px", ...T.caption, color: K.muted }}>Total ({filteredItems.length})</td>
+                        <td style={{ padding: "14px 12px", color: K.orange, fontFamily: MONO, fontWeight: 700, fontSize: 16, fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{formatBRL(totalGeral)}</td>
+                        <td colSpan={3} />
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
                 {totalPages > 1 && (
-                  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, padding: "14px 16px", borderTop: "1px solid #13131e", fontSize: 12 }}>
-                    <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={safePage === 1}
-                      style={{ ...actionBtn("#888"), opacity: safePage === 1 ? 0.3 : 1, cursor: safePage === 1 ? "default" : "pointer" }}
-                    >← Anterior</button>
-                    <span style={{ color: "#666" }}>Página {safePage} de {totalPages}</span>
-                    <button
-                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                      disabled={safePage === totalPages}
-                      style={{ ...actionBtn("#888"), opacity: safePage === totalPages ? 0.3 : 1, cursor: safePage === totalPages ? "default" : "pointer" }}
-                    >Próxima →</button>
+                  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 14, padding: "14px 16px", borderTop: `1px solid ${K.border}` }}>
+                    <Btn kind="secondary" size="sm" icon="arrow-left" disabled={safePage === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>Anterior</Btn>
+                    <span style={{ ...T.small, color: K.text2 }}>Página <span style={{ ...T.mono, color: K.text }}>{safePage}</span> de <span style={{ ...T.mono, color: K.text }}>{totalPages}</span></span>
+                    <Btn kind="secondary" size="sm" iconRight="arrow-right" disabled={safePage === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Próxima</Btn>
                   </div>
                 )}
-              </div>
+              </Card>
             )}
+
+            {/* Resumo */}
             {filteredItems.length > 0 && comprasTab === "resumo" && (
-              <div className="anim" style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 8 }}>
-                <div style={{ ...cardStyle, padding: 24 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#555", marginBottom: 20, textTransform: "uppercase", letterSpacing: 2 }}>Gastos por categoria</div>
-                  {sortedCategories.map(([cat, total]) => (<div key={cat} style={{ marginBottom: 14 }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}><span style={{ fontSize: 13, color: "#ccc", display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontSize: 15 }}>{CAT_ICON[cat]}</span>{cat}</span><span style={{ fontSize: 13, fontWeight: 600, color: CAT_COLOR[cat] }}>{formatBRL(total)} <span style={{ color: "#444", fontWeight: 400, fontSize: 11 }}>({((total / totalGeral) * 100).toFixed(1)}%)</span></span></div><div style={{ height: 5, background: "#13131e", borderRadius: 3, overflow: "hidden" }}><div style={{ height: "100%", width: `${(total / maxCatValue) * 100}%`, background: CAT_COLOR[cat], borderRadius: 3, opacity: 0.7 }} /></div></div>))}
-                </div>
-                <div style={{ ...cardStyle, padding: 24 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#555", marginBottom: 16, textTransform: "uppercase", letterSpacing: 2 }}>Top 10 maiores gastos</div>
-                  {[...filteredItems].sort((a, b) => b.totalPrice - a.totalPrice).slice(0, 10).map((item, i) => (<div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: i < 9 ? "1px solid #0e0e18" : "none" }}><div style={{ display: "flex", alignItems: "center", gap: 12 }}><span style={{ width: 22, height: 22, borderRadius: 6, background: "#13131e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#555", fontWeight: 700 }}>{i + 1}</span><span style={{ color: "#ddd", fontSize: 13 }}>{item.product}</span></div><span style={{ color: "#6ee7b7", fontWeight: 600, fontSize: 13 }}>{formatBRL(item.totalPrice)}</span></div>))}
-                </div>
+              <div className="kuali-anim" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 14, marginTop: 8 }}>
+                <Card padding={22}>
+                  <div style={{ ...T.caption, color: K.muted }}>POR CATEGORIA</div>
+                  <div style={{ ...T.h3, color: K.text, marginTop: 4, marginBottom: 18 }}>Consumo do período</div>
+                  {sortedCategories.map(([cat, total]) => {
+                    const color = CAT_COLOR[cat] || K.muted;
+                    return (
+                      <div key={cat} style={{ marginBottom: 14 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                          <span style={{ ...T.small, color: K.text, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 8 }}>
+                            <Icon name={CAT_ICON[cat]} size={14} color={color} /> {cat}
+                          </span>
+                          <span style={{ ...T.mono, color: K.text2 }}>
+                            {formatBRL(total)} <span style={{ color: K.muted }}>({((total / totalGeral) * 100).toFixed(1)}%)</span>
+                          </span>
+                        </div>
+                        <div style={{ height: 6, background: K.surface2, borderRadius: 4, overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${(total / maxCatValue) * 100}%`, background: color, borderRadius: 4 }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </Card>
+                <Card padding={22}>
+                  <div style={{ ...T.caption, color: K.muted }}>RANKING</div>
+                  <div style={{ ...T.h3, color: K.text, marginTop: 4, marginBottom: 14 }}>Top 10 maiores gastos</div>
+                  {[...filteredItems].sort((a, b) => b.totalPrice - a.totalPrice).slice(0, 10).map((item, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < 9 ? `1px solid ${K.border}` : "none" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{ width: 26, height: 26, borderRadius: 8, background: i < 3 ? `${K.orange}1A` : K.surface2, display: "flex", alignItems: "center", justifyContent: "center", color: i < 3 ? K.orange : K.muted, fontWeight: 800, ...T.small, fontFamily: MONO }}>{i + 1}</span>
+                        <span style={{ ...T.body, color: K.text }}>{item.product}</span>
+                      </div>
+                      <span style={{ ...T.mono, color: K.text, fontWeight: 700, fontSize: 14 }}>{formatBRL(item.totalPrice)}</span>
+                    </div>
+                  ))}
+                </Card>
               </div>
             )}
-            {items.length === 0 && !processing && comprasTab === "notas" && (<div style={{ textAlign: "center", padding: "44px 20px" }}><div style={{ fontSize: 44, marginBottom: 12, opacity: 0.2 }}>📊</div><p style={{ fontSize: 14, color: "#444" }}>Nenhuma nota fiscal analisada</p></div>)}
+
+            {items.length === 0 && !processing && comprasTab === "notas" && (
+              <Card padding={48} style={{ textAlign: "center", marginTop: 16 }}>
+                <div style={{ width: 56, height: 56, borderRadius: 16, background: K.surface2, color: K.muted, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+                  <Icon name="receipt" size={28} />
+                </div>
+                <div style={{ ...T.bodyB, color: K.text }}>Nenhuma nota fiscal lançada</div>
+                <div style={{ ...T.small, color: K.muted, marginTop: 4 }}>Solte uma foto acima para a IA extrair os itens automaticamente</div>
+              </Card>
+            )}
           </div>
-        </>
+        </div>
       )}
 
       {/* TAB: PRODUÇÃO */}

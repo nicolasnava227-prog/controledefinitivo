@@ -10,6 +10,7 @@
     "migrate": "node scripts/migrate-turso-to-supabase.js"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "dotenv": "^16.4.0",
     "express": "^4.21.0",
     "pg": "^8.13.1",

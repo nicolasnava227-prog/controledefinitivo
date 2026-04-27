@@ -4,9 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preload" href="/api/bootstrap" as="fetch" crossorigin="anonymous" />
-    <title>Controle Kuali</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>" />
-    <style>* { margin: 0; padding: 0; box-sizing: border-box; } body { background: #08080c; }</style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+    <title>Kuali</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' rx='6' fill='%23FF6A00'/><text x='12' y='17' text-anchor='middle' font-family='Inter,sans-serif' font-size='15' font-weight='800' fill='%230D0D0D' letter-spacing='-1'>k</text></svg>" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { background: #141416; font-family: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+      @keyframes kuali-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      @keyframes kuali-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+      .kuali-anim { animation: kuali-fade-in 220ms ease-out; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
