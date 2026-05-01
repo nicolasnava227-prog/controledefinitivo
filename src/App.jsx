@@ -143,6 +143,20 @@ function Lightbox({ src, onClose }) {
   );
 }
 
+function RestrictedArea() {
+  return (
+    <div className="kuali-anim" style={{ padding: "60px 16px", maxWidth: 480, margin: "0 auto", fontFamily: FONT }}>
+      <Card padding={36} style={{ textAlign: "center" }}>
+        <div style={{ width: 56, height: 56, borderRadius: 16, background: K.surface2, color: K.muted, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+          <Icon name="alert" size={28} />
+        </div>
+        <div style={{ ...T.bodyB, color: K.text }}>Área restrita</div>
+        <div style={{ ...T.small, color: K.muted, marginTop: 6 }}>Disponível apenas para administradores.</div>
+      </Card>
+    </div>
+  );
+}
+
 function RemindersModal({ reminders, currentUser, onAdd, onRemove, onClose }) {
   const [text, setText] = useState("");
   const submit = () => { if (!text.trim()) return; onAdd(text); setText(""); };
@@ -436,55 +450,107 @@ function EmployeeManager({ users, onAdd, onUpdate, onRemove }) {
   const startEdit = (u) => { setEditId(u.id); setForm({ name: u.name, username: u.username, password: u.password, role: u.role, isAdmin: u.isAdmin }); };
   const remove = (id) => { if (id === "admin") return alert("Não pode remover o admin principal"); onRemove(id); };
 
+  const inputStyle = {
+    width: "100%", background: K.surface2, border: `1px solid ${K.border}`,
+    borderRadius: 10, padding: "10px 12px", color: K.text,
+    fontFamily: FONT, fontSize: 14, outline: "none",
+  };
+
   return (
-    <div style={{ padding: "20px 28px", maxWidth: 800, margin: "0 auto" }}>
-      <div style={{ ...cardStyle, marginBottom: 20, padding: 20 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 14 }}>
-          {editId ? "Editar funcionário" : "Adicionar funcionário"}
+    <div className="kuali-anim" style={{ padding: "20px 16px 32px", maxWidth: 880, margin: "0 auto", fontFamily: FONT }}>
+      <Card padding={18} style={{ marginBottom: 18 }}>
+        <div style={{ ...T.caption, color: K.muted, marginBottom: 14 }}>
+          {editId ? "EDITAR FUNCIONÁRIO" : "ADICIONAR FUNCIONÁRIO"}
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div style={{ flex: "1 1 150px" }}>
-            <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Nome completo</label>
-            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Maria Silva" style={{ ...inputBase, width: "100%" }} />
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12, marginBottom: 14 }}>
+          <div>
+            <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Nome completo</label>
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Maria Silva"
+              onFocus={e => { e.currentTarget.style.borderColor = K.orange; }}
+              onBlur={e => { e.currentTarget.style.borderColor = K.border; }}
+              style={inputStyle} />
           </div>
-          <div style={{ flex: "0 0 130px" }}>
-            <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Usuário (login)</label>
-            <input value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} placeholder="maria" style={{ ...inputBase, width: "100%" }} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Usuário (login)</label>
+              <input value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} placeholder="maria"
+                autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                onFocus={e => { e.currentTarget.style.borderColor = K.orange; }}
+                onBlur={e => { e.currentTarget.style.borderColor = K.border; }}
+                style={inputStyle} />
+            </div>
+            <div>
+              <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Senha</label>
+              <input value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="1234"
+                onFocus={e => { e.currentTarget.style.borderColor = K.orange; }}
+                onBlur={e => { e.currentTarget.style.borderColor = K.border; }}
+                style={inputStyle} />
+            </div>
           </div>
-          <div style={{ flex: "0 0 120px" }}>
-            <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Senha</label>
-            <input value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="1234" style={{ ...inputBase, width: "100%" }} />
-          </div>
-          <div style={{ flex: "0 0 160px" }}>
-            <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Função</label>
-            <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} style={{ ...inputBase, width: "100%" }}>
+          <div>
+            <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Função</label>
+            <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} style={inputStyle}>
               {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "#888", padding: "8px 0" }}>
-            <input type="checkbox" checked={form.isAdmin} onChange={e => setForm({ ...form, isAdmin: e.target.checked })} /> Admin
-          </label>
-          <button onClick={save} style={{ ...actionBtn("#6ee7b7"), fontWeight: 600, padding: "8px 20px" }}>{editId ? "Salvar" : "+ Adicionar"}</button>
-          {editId && <button onClick={() => { setEditId(null); setForm({ name: "", username: "", password: "", role: ROLES[0], isAdmin: false }); }} style={actionBtn("#888")}>Cancelar</button>}
         </div>
-      </div>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 14, padding: "8px 12px", background: form.isAdmin ? `${K.orange}1A` : K.surface2, border: `1px solid ${form.isAdmin ? `${K.orange}55` : K.border}`, borderRadius: 10, transition: "all 150ms ease" }}>
+          <div style={{
+            width: 20, height: 20, borderRadius: 6,
+            background: form.isAdmin ? K.orange : "transparent",
+            border: `2px solid ${form.isAdmin ? K.orange : K.borderStrong}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            {form.isAdmin && <Icon name="check-bold" size={12} color={K.black} />}
+          </div>
+          <input type="checkbox" checked={form.isAdmin} onChange={e => setForm({ ...form, isAdmin: e.target.checked })} style={{ display: "none" }} />
+          <span style={{ ...T.bodyB, color: form.isAdmin ? K.orange : K.text2, fontSize: 13 }}>Acesso admin</span>
+        </label>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Btn kind="primary" icon={editId ? "check" : "plus"} onClick={save}>{editId ? "Salvar alterações" : "Adicionar funcionário"}</Btn>
+          {editId && <Btn kind="secondary" icon="x" onClick={() => { setEditId(null); setForm({ name: "", username: "", password: "", role: ROLES[0], isAdmin: false }); }}>Cancelar</Btn>}
+        </div>
+      </Card>
 
-      {users.map(u => (
-        <div key={u.id} style={{ ...cardStyle, marginBottom: 8, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: u.isAdmin ? "#34d39920" : "#38bdf820", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: u.isAdmin ? "#6ee7b7" : "#38bdf8" }}>
-            {u.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()}
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#ddd", display: "flex", alignItems: "center", gap: 8 }}>
-              {u.name}
-              {u.isAdmin && <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 8, background: "#34d39918", color: "#6ee7b7", border: "1px solid #34d39930" }}>admin</span>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {users.map(u => (
+          <div key={u.id} style={{ background: K.surface, border: `1px solid ${K.border}`, borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: u.isAdmin ? `${K.orange}22` : K.surface2,
+              color: u.isAdmin ? K.orange : K.text2,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontFamily: FONT, fontSize: 14, fontWeight: 800, letterSpacing: "-0.02em",
+              flexShrink: 0,
+            }}>
+              {u.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()}
             </div>
-            <div style={{ fontSize: 12, color: "#555" }}>@{u.username} · {u.role}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ ...T.bodyB, color: K.text }}>{u.name}</span>
+                {u.isAdmin && <Chip color={K.orange} bg={`${K.orange}1A`}>admin</Chip>}
+              </div>
+              <div style={{ ...T.small, color: K.muted, marginTop: 2 }}>
+                <span style={{ ...T.mono }}>@{u.username}</span> · {u.role}
+              </div>
+            </div>
+            <button onClick={() => startEdit(u)} title="Editar"
+              style={{ background: "transparent", border: "none", cursor: "pointer", color: K.muted, padding: 6, display: "flex" }}
+              onMouseEnter={e => e.currentTarget.style.color = K.text}
+              onMouseLeave={e => e.currentTarget.style.color = K.muted}>
+              <Icon name="edit" size={16} />
+            </button>
+            {u.id !== "admin" && (
+              <button onClick={() => remove(u.id)} title="Remover"
+                style={{ background: "transparent", border: "none", cursor: "pointer", color: K.muted, padding: 6, display: "flex" }}
+                onMouseEnter={e => e.currentTarget.style.color = K.err}
+                onMouseLeave={e => e.currentTarget.style.color = K.muted}>
+                <Icon name="trash" size={16} />
+              </button>
+            )}
           </div>
-          <button onClick={() => startEdit(u)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, opacity: 0.4 }} onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = 0.4}>✏️</button>
-          {u.id !== "admin" && <button onClick={() => remove(u.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, opacity: 0.4 }} onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = 0.4}>🗑️</button>}
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -650,77 +716,127 @@ function ChecklistCreate({ templates, onAdd, onUpdate, onRemove }) {
     return { ...f, items: arr };
   });
 
+  const inputStyle = {
+    width: "100%", background: K.surface2, border: `1px solid ${K.border}`,
+    borderRadius: 10, padding: "10px 12px", color: K.text,
+    fontFamily: FONT, fontSize: 14, outline: "none",
+  };
+
   return (
-    <div style={{ padding: "20px 28px", maxWidth: 800, margin: "0 auto" }}>
-      <div style={{ ...cardStyle, padding: 20, marginBottom: 20 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 14 }}>
-          {editId ? "Editar checklist" : "Criar novo checklist"}
+    <div className="kuali-anim" style={{ padding: "20px 16px 32px", maxWidth: 880, margin: "0 auto", fontFamily: FONT }}>
+      <Card padding={18} style={{ marginBottom: 20 }}>
+        <div style={{ ...T.caption, color: K.muted, marginBottom: 14 }}>
+          {editId ? "EDITAR CHECKLIST" : "CRIAR NOVO CHECKLIST"}
         </div>
-        <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-          <div style={{ flex: "1 1 250px" }}>
-            <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Nome do checklist</label>
-            <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Ex: Abertura do restaurante" style={{ ...inputBase, width: "100%" }} />
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12, marginBottom: 14 }}>
+          <div>
+            <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Nome do checklist</label>
+            <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Ex: Abertura do restaurante"
+              onFocus={e => { e.currentTarget.style.borderColor = K.orange; }}
+              onBlur={e => { e.currentTarget.style.borderColor = K.border; }}
+              style={inputStyle} />
           </div>
-          <div style={{ flex: "0 0 180px" }}>
-            <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Categoria</label>
-            <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} style={{ ...inputBase, width: "100%" }}>
+          <div>
+            <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Categoria</label>
+            <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} style={inputStyle}>
               {CL_CATS.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         </div>
 
-        <div style={{ fontSize: 11, color: "#666", marginBottom: 8 }}>Itens do checklist</div>
+        <div style={{ ...T.caption, color: K.text2, marginBottom: 10 }}>Itens do checklist</div>
         {form.items.map((item, i) => (
-          <div key={i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <button onClick={() => moveItem(i, -1)} disabled={i === 0} style={{ background: "none", border: "none", cursor: i === 0 ? "default" : "pointer", fontSize: 10, opacity: i === 0 ? 0.15 : 0.5, color: "#fff", padding: 0, lineHeight: 1 }} onMouseEnter={e => { if (i > 0) e.target.style.opacity = 1; }} onMouseLeave={e => { if (i > 0) e.target.style.opacity = 0.5; }}>▲</button>
-              <button onClick={() => moveItem(i, 1)} disabled={i === form.items.length - 1} style={{ background: "none", border: "none", cursor: i === form.items.length - 1 ? "default" : "pointer", fontSize: 10, opacity: i === form.items.length - 1 ? 0.15 : 0.5, color: "#fff", padding: 0, lineHeight: 1 }} onMouseEnter={e => { if (i < form.items.length - 1) e.target.style.opacity = 1; }} onMouseLeave={e => { if (i < form.items.length - 1) e.target.style.opacity = 0.5; }}>▼</button>
+          <div key={i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 1, flexShrink: 0 }}>
+              <button onClick={() => moveItem(i, -1)} disabled={i === 0} aria-label="Subir"
+                style={{ background: "transparent", border: "none", cursor: i === 0 ? "default" : "pointer", color: K.muted, opacity: i === 0 ? 0.2 : 1, padding: 2, display: "flex" }}>
+                <Icon name="chevron-down" size={12} style={{ transform: "rotate(180deg)" }} />
+              </button>
+              <button onClick={() => moveItem(i, 1)} disabled={i === form.items.length - 1} aria-label="Descer"
+                style={{ background: "transparent", border: "none", cursor: i === form.items.length - 1 ? "default" : "pointer", color: K.muted, opacity: i === form.items.length - 1 ? 0.2 : 1, padding: 2, display: "flex" }}>
+                <Icon name="chevron-down" size={12} />
+              </button>
             </div>
-            <span style={{ color: "#333", fontSize: 12, minWidth: 20 }}>{i + 1}.</span>
-            <input value={item.text} onChange={e => updateItem(i, "text", e.target.value)} placeholder="Descreva a tarefa..."
-              style={{ ...inputBase, flex: 1 }} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addItem(); } }} />
-            <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", fontSize: 11, color: item.requiresPhoto ? "#fbbf24" : "#444", whiteSpace: "nowrap", padding: "4px 8px", borderRadius: 6, background: item.requiresPhoto ? "#fbbf2412" : "transparent", border: `1px solid ${item.requiresPhoto ? "#fbbf2430" : "#1e1e2e"}` }}>
-              <input type="checkbox" checked={item.requiresPhoto} onChange={e => updateItem(i, "requiresPhoto", e.target.checked)} style={{ accentColor: "#fbbf24" }} />
-              📷 Foto
+            <span style={{ ...T.mono, color: K.muted, minWidth: 24, fontSize: 13 }}>{i + 1}.</span>
+            <input value={item.text} onChange={e => updateItem(i, "text", e.target.value)} placeholder="Descreva a tarefa…"
+              onFocus={e => { e.currentTarget.style.borderColor = K.orange; }}
+              onBlur={e => { e.currentTarget.style.borderColor = K.border; }}
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addItem(); } }}
+              style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
+            <label style={{
+              display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer",
+              padding: "6px 10px", borderRadius: 8,
+              background: item.requiresPhoto ? `${K.orange}1A` : "transparent",
+              border: `1px solid ${item.requiresPhoto ? `${K.orange}55` : K.border}`,
+              color: item.requiresPhoto ? K.orange : K.text2,
+              ...T.small, fontWeight: 600, whiteSpace: "nowrap",
+              transition: "all 150ms ease",
+            }}>
+              <input type="checkbox" checked={item.requiresPhoto} onChange={e => updateItem(i, "requiresPhoto", e.target.checked)} style={{ display: "none" }} />
+              <Icon name="camera" size={14} /> Foto
             </label>
             {form.items.length > 1 && (
-              <button onClick={() => removeItem(i)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, opacity: 0.4, color: "#fff" }}
-                onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = 0.4}>✕</button>
+              <button onClick={() => removeItem(i)} aria-label="Remover item"
+                style={{ background: "transparent", border: "none", cursor: "pointer", color: K.muted, padding: 6, display: "flex", flexShrink: 0 }}
+                onMouseEnter={e => e.currentTarget.style.color = K.err}
+                onMouseLeave={e => e.currentTarget.style.color = K.muted}>
+                <Icon name="x" size={16} />
+              </button>
             )}
           </div>
         ))}
-        <button onClick={addItem} style={{ ...actionBtn("#888"), fontSize: 11, marginTop: 4, marginBottom: 16 }}>+ Adicionar item</button>
-
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={save} style={{ ...actionBtn("#6ee7b7"), fontWeight: 600 }}>{editId ? "Salvar alterações" : "Criar checklist"}</button>
-          {editId && <button onClick={() => { setEditId(null); setForm(empty); }} style={actionBtn("#888")}>Cancelar</button>}
+        <div style={{ marginTop: 10, marginBottom: 16 }}>
+          <Btn kind="secondary" size="sm" icon="plus" onClick={addItem}>Adicionar item</Btn>
         </div>
-      </div>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Btn kind="primary" icon={editId ? "check" : "plus"} onClick={save}>{editId ? "Salvar alterações" : "Criar checklist"}</Btn>
+          {editId && <Btn kind="secondary" icon="x" onClick={() => { setEditId(null); setForm(empty); }}>Cancelar</Btn>}
+        </div>
+      </Card>
 
       {/* Existing templates */}
-      {templates.length > 0 && <div style={{ fontSize: 11, fontWeight: 600, color: "#444", textTransform: "uppercase", letterSpacing: 2, marginBottom: 12 }}>Checklists criados ({templates.length})</div>}
-      {templates.map(t => (
-        <div key={t.id} style={{ ...cardStyle, marginBottom: 10, padding: "16px 18px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: "#ddd" }}>{t.title}</span>
-              <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 8, background: (CL_CAT_COLORS[t.category] || "#666") + "18", color: CL_CAT_COLORS[t.category] || "#888", border: `1px solid ${(CL_CAT_COLORS[t.category] || "#666")}30` }}>{t.category}</span>
-            </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => startEdit(t)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, opacity: 0.4 }} onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = 0.4}>✏️</button>
-              <button onClick={() => remove(t.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, opacity: 0.4 }} onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = 0.4}>🗑️</button>
-            </div>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {t.items.map((item, i) => (
-              <div key={i} style={{ fontSize: 12, color: "#888", display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ color: "#333" }}>☐</span> {item.text}
-                {item.requiresPhoto && <span style={{ fontSize: 10, color: "#fbbf24" }}>📷</span>}
+      {templates.length > 0 && (
+        <div style={{ ...T.caption, color: K.muted, marginBottom: 12 }}>CHECKLISTS CRIADOS ({templates.length})</div>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {templates.map(t => {
+          const catColor = CL_CAT_COLORS[t.category] || K.muted;
+          return (
+            <Card key={t.id} padding={16}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 10, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+                  <span style={{ ...T.bodyB, color: K.text }}>{t.title}</span>
+                  <Chip icon={CL_CAT_ICONS[t.category]} color={catColor} bg={`${catColor}1A`}>{t.category}</Chip>
+                </div>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button onClick={() => startEdit(t)} title="Editar"
+                    style={{ background: "transparent", border: "none", cursor: "pointer", color: K.muted, padding: 6, display: "flex" }}
+                    onMouseEnter={e => e.currentTarget.style.color = K.text}
+                    onMouseLeave={e => e.currentTarget.style.color = K.muted}>
+                    <Icon name="edit" size={16} />
+                  </button>
+                  <button onClick={() => remove(t.id)} title="Remover"
+                    style={{ background: "transparent", border: "none", cursor: "pointer", color: K.muted, padding: 6, display: "flex" }}
+                    onMouseEnter={e => e.currentTarget.style.color = K.err}
+                    onMouseLeave={e => e.currentTarget.style.color = K.muted}>
+                    <Icon name="trash" size={16} />
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      ))}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {t.items.map((item, i) => (
+                  <div key={i} style={{ ...T.small, color: K.text2, display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 14, height: 14, borderRadius: 4, border: `1.5px solid ${K.borderStrong}`, flexShrink: 0 }} />
+                    <span style={{ flex: 1, minWidth: 0 }}>{item.text}</span>
+                    {item.requiresPhoto && <Icon name="camera" size={13} color={K.orange} />}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1163,111 +1279,166 @@ function ChecklistAnalysis({ completions, users, onPhotoClick }) {
   const uniqueUsers = [...new Set(viewable.map(c => c.userId))].length;
   const byCat = viewable.reduce((acc, c) => { acc[c.category] = (acc[c.category] || 0) + 1; return acc; }, {});
 
+  const inputStyle = {
+    width: "100%", background: K.surface2, border: `1px solid ${K.border}`,
+    borderRadius: 10, padding: "10px 12px", color: K.text,
+    fontFamily: FONT, fontSize: 14, outline: "none", colorScheme: "dark",
+  };
+
   return (
-    <div className="anim" style={{ padding: "20px 28px", maxWidth: 900, margin: "0 auto" }}>
+    <div className="kuali-anim" style={{ padding: "20px 16px 32px", maxWidth: 960, margin: "0 auto", fontFamily: FONT }}>
       {/* Info banner */}
-      <div style={{ ...cardStyle, padding: "12px 18px", marginBottom: 16, borderLeftWidth: 3, borderLeftColor: "#fbbf24", display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ fontSize: 16 }}>⏳</span>
-        <span style={{ fontSize: 12, color: "#888" }}>Os checklists ficam disponíveis para revisão por <span style={{ color: "#fbbf24", fontWeight: 600 }}>7 dias</span>. Após esse prazo, saem da visualização (dados mantidos).</span>
-        {expired.length > 0 && <span style={{ fontSize: 11, color: "#555", marginLeft: "auto" }}>{expired.length} expirados</span>}
-      </div>
+      <Card padding={14} style={{ marginBottom: 16, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: K.yellow }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 10, background: `${K.yellow}1A`, color: K.yellow, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Icon name="clock" size={16} />
+          </div>
+          <div style={{ ...T.small, color: K.text2, flex: 1, minWidth: 0 }}>
+            Checklists ficam disponíveis por <span style={{ color: K.yellow, fontWeight: 700 }}>7 dias</span>. Depois disso somem da visualização (mas os dados ficam guardados).
+          </div>
+          {expired.length > 0 && (
+            <span style={{ ...T.caption, color: K.muted, whiteSpace: "nowrap", fontFamily: MONO, flexShrink: 0 }}>
+              {expired.length} expirados
+            </span>
+          )}
+        </div>
+      </Card>
 
       {/* Filters */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 16 }}>
         <div>
-          <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Data</label>
-          <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} style={{ ...inputBase, colorScheme: "dark" }} />
+          <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Data</label>
+          <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} style={inputStyle} />
         </div>
         <div>
-          <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Funcionário</label>
-          <select value={filterUser} onChange={e => setFilterUser(e.target.value)} style={inputBase}>
+          <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Funcionário</label>
+          <select value={filterUser} onChange={e => setFilterUser(e.target.value)} style={inputStyle}>
             <option value="all">Todos</option>
             {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         </div>
         <div>
-          <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Categoria</label>
-          <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={inputBase}>
+          <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Categoria</label>
+          <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={inputStyle}>
             <option value="all">Todas</option>
             {CL_CATS.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
-        {filterDate && <button onClick={() => setFilterDate("")} style={{ ...actionBtn("#888"), fontSize: 11, padding: "6px 12px" }}>Limpar data</button>}
       </div>
-
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 20 }}>
-        {[
-          { label: "Checklists (7 dias)", value: totalThisWeek, color: "#6ee7b7" },
-          { label: "Dias com registros", value: uniqueDays, color: "#38bdf8" },
-          { label: "Funcionários ativos", value: uniqueUsers, color: "#c084fc" },
-        ].map(s => (
-          <div key={s.label} style={cardStyle}>
-            <div style={{ fontSize: 10, color: "#4a4a5a", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6 }}>{s.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* By category mini-chart */}
-      {Object.keys(byCat).length > 0 && (
-        <div style={{ ...cardStyle, padding: 18, marginBottom: 20 }}>
-          <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 12 }}>Por categoria</div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([cat, count]) => (
-              <span key={cat} style={{ padding: "5px 12px", borderRadius: 10, fontSize: 12, background: (CL_CAT_COLORS[cat] || "#666") + "15", color: CL_CAT_COLORS[cat] || "#888", border: `1px solid ${(CL_CAT_COLORS[cat] || "#666")}25` }}>
-                {cat}: {count}
-              </span>
-            ))}
-          </div>
+      {filterDate && (
+        <div style={{ marginBottom: 16 }}>
+          <Btn kind="ghost" size="sm" icon="x" onClick={() => setFilterDate("")} style={{ color: K.muted }}>Limpar data</Btn>
         </div>
       )}
 
-      {/* Completion list */}
-      {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#333" }}>Nenhum checklist no período selecionado</div>}
-      {filtered.map(c => (
-        <div key={c.id} style={{ ...cardStyle, marginBottom: 10, padding: "16px 18px" }}>
-          <div onClick={() => toggleExpand(c)} style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 15 }}>✅</span>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#ddd" }}>{c.templateTitle}</div>
-                <div style={{ fontSize: 11, color: "#555" }}>{c.userName} · {formatDateBR(c.date)} às {c.time}</div>
-              </div>
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 18 }}>
+        {[
+          { label: "CHECKLISTS (7 DIAS)", value: totalThisWeek, icon: "list" },
+          { label: "DIAS COM REGISTROS", value: uniqueDays, icon: "clock" },
+          { label: "FUNCIONÁRIOS ATIVOS", value: uniqueUsers, icon: "user" },
+        ].map(s => (
+          <Card key={s.label} padding={14}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <Icon name={s.icon} size={14} color={K.orange} />
+              <span style={{ ...T.caption, color: K.muted, fontSize: 10 }}>{s.label}</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 8, background: (CL_CAT_COLORS[c.category] || "#666") + "18", color: CL_CAT_COLORS[c.category] || "#888" }}>{c.category}</span>
-              <span style={{ fontSize: 14, color: "#555", transform: expandedId === c.id ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s" }}>▾</span>
-            </div>
+            <div style={{ fontFamily: MONO, fontSize: 24, fontWeight: 700, color: K.text, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}>{s.value}</div>
+          </Card>
+        ))}
+      </div>
+
+      {/* By category */}
+      {Object.keys(byCat).length > 0 && (
+        <Card padding={16} style={{ marginBottom: 20 }}>
+          <div style={{ ...T.caption, color: K.muted, marginBottom: 12 }}>POR CATEGORIA</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([cat, count]) => {
+              const color = CL_CAT_COLORS[cat] || K.muted;
+              return (
+                <span key={cat} style={{
+                  padding: "6px 12px", borderRadius: 9999,
+                  background: `${color}1A`, color, border: `1px solid ${color}55`,
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  ...T.small, fontWeight: 700,
+                }}>
+                  <Icon name={CL_CAT_ICONS[cat] || "note"} size={12} /> {cat} <span style={{ ...T.mono, opacity: 0.7 }}>· {count}</span>
+                </span>
+              );
+            })}
           </div>
-          {expandedId === c.id && (
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #13131e" }}>
-              {loadingId === c.id && !detailCache[c.id] && (
-                <div style={{ fontSize: 12, color: "#555", padding: "4px 0" }}>Carregando detalhes...</div>
-              )}
-              {(detailCache[c.id] || []).map((item, i) => {
-                const photos = item.photos || (item.photo ? [item.photo] : []);
-                return (
-                  <div key={i} style={{ marginBottom: 10 }}>
-                    <div style={{ fontSize: 13, color: "#aaa", display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ color: "#34d399" }}>✓</span> {item.text}
-                    </div>
-                    {photos.length > 0 && (
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6, marginLeft: 20 }}>
-                        {photos.map((photo, pi) => (
-                          <img key={pi} src={photo} onClick={() => onPhotoClick(photo)} style={{ width: 120, height: 90, objectFit: "cover", borderRadius: 8, border: "1px solid #1e1e2e", cursor: "pointer", transition: "opacity 0.15s" }} title="Clique para ampliar"
-                            onMouseEnter={e => e.target.style.opacity = 0.8} onMouseLeave={e => e.target.style.opacity = 1} />
-                        ))}
-                      </div>
-                    )}
+        </Card>
+      )}
+
+      {/* Completion list */}
+      {filtered.length === 0 && (
+        <Card padding={40} style={{ textAlign: "center" }}>
+          <div style={{ width: 48, height: 48, borderRadius: 14, background: K.surface2, color: K.muted, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+            <Icon name="list" size={22} />
+          </div>
+          <div style={{ ...T.bodyB, color: K.text }}>Nenhum checklist no período</div>
+          <div style={{ ...T.small, color: K.muted, marginTop: 4 }}>Ajuste os filtros pra ver registros antigos</div>
+        </Card>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {filtered.map(c => {
+          const catColor = CL_CAT_COLORS[c.category] || K.muted;
+          const isOpen = expandedId === c.id;
+          return (
+            <Card key={c.id} padding={16}>
+              <div onClick={() => toggleExpand(c)} style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: 1 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 10, background: `${K.green}1A`, color: K.green, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Icon name="check-circle" size={18} />
                   </div>
-                );
-              })}
-              <div style={{ fontSize: 10, color: "#333", marginTop: 8 }}>Expira em {formatDateBR(c.expiresAt)}</div>
-            </div>
-          )}
-        </div>
-      ))}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ ...T.bodyB, color: K.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.templateTitle}</div>
+                    <div style={{ ...T.small, color: K.muted, marginTop: 2 }}>{c.userName} · {formatDateBR(c.date)} às <span style={T.mono}>{c.time}</span></div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <Chip icon={CL_CAT_ICONS[c.category]} color={catColor} bg={`${catColor}1A`}>{c.category}</Chip>
+                  <span style={{ display: "flex", color: K.muted, transform: isOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform 200ms ease" }}>
+                    <Icon name="chevron-down" size={16} />
+                  </span>
+                </div>
+              </div>
+              {isOpen && (
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${K.border}` }}>
+                  {loadingId === c.id && !detailCache[c.id] && (
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, ...T.small, color: K.text2, padding: "4px 0" }}>
+                      <Icon name="spinner" size={14} spin /> Carregando detalhes…
+                    </div>
+                  )}
+                  {(detailCache[c.id] || []).map((item, i) => {
+                    const photos = item.photos || (item.photo ? [item.photo] : []);
+                    return (
+                      <div key={i} style={{ marginBottom: 12 }}>
+                        <div style={{ ...T.body, fontSize: 14, color: K.text2, display: "flex", alignItems: "center", gap: 8 }}>
+                          <Icon name="check-circle" size={14} color={K.green} /> {item.text}
+                        </div>
+                        {photos.length > 0 && (
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8, marginLeft: 22 }}>
+                            {photos.map((photo, pi) => (
+                              <img key={pi} src={photo} onClick={() => onPhotoClick(photo)}
+                                style={{ width: 120, height: 90, objectFit: "cover", borderRadius: 10, border: `1px solid ${K.border}`, cursor: "pointer", transition: "opacity 150ms ease" }}
+                                title="Clique para ampliar"
+                                onMouseEnter={e => e.currentTarget.style.opacity = 0.8}
+                                onMouseLeave={e => e.currentTarget.style.opacity = 1} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <div style={{ ...T.caption, color: K.muted, marginTop: 8 }}>EXPIRA EM <span style={T.mono}>{formatDateBR(c.expiresAt)}</span></div>
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1343,90 +1514,97 @@ function ProductionControlView({ items, cycle, onUpdateItem, onUpdateCycle }) {
 
   if (sorted.length === 0) {
     return (
-      <div style={{ textAlign: "center", padding: "60px 20px" }}>
-        <div style={{ fontSize: 44, marginBottom: 12, opacity: 0.2 }}>🏭</div>
-        <p style={{ fontSize: 14, color: "#555" }}>Nenhum item de produção cadastrado ainda.</p>
-        <p style={{ fontSize: 12, color: "#444", marginTop: 6 }}>Um administrador precisa adicionar itens em "Gerenciar itens".</p>
+      <div className="kuali-anim" style={{ padding: "60px 16px", maxWidth: 480, margin: "0 auto" }}>
+        <Card padding={36} style={{ textAlign: "center" }}>
+          <div style={{ width: 56, height: 56, borderRadius: 16, background: K.surface2, color: K.muted, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+            <Icon name="production" size={28} />
+          </div>
+          <div style={{ ...T.bodyB, color: K.text }}>Nenhum item de produção cadastrado</div>
+          <div style={{ ...T.small, color: K.muted, marginTop: 6 }}>Um administrador precisa adicionar itens em "Gerenciar itens".</div>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="anim" style={{ padding: "20px 28px", maxWidth: 720, margin: "0 auto" }}>
-      <div style={{ ...cardStyle, padding: "14px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 12, borderLeft: `3px solid ${locked ? "#6ee7b7" : "#fbbf24"}` }}>
-        <span style={{ fontSize: 18 }}>{locked ? "🔒" : "📝"}</span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, color: "#ddd", fontWeight: 600 }}>
-            {locked ? "Ciclo concluído" : "Ciclo aberto para edição"}
+    <div className="kuali-anim" style={{ padding: "20px 16px 32px", maxWidth: 720, margin: "0 auto", fontFamily: FONT }}>
+      <Card padding={14} style={{ marginBottom: 14, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: locked ? K.green : K.orange }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: locked ? `${K.green}1A` : `${K.orange}1A`, color: locked ? K.green : K.orange, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Icon name={locked ? "check-circle" : "production"} size={18} />
           </div>
-          <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>
-            {locked
-              ? `Reabre em ${formatCountdown(nextCycleStart - now)} · próximo ciclo às 21h`
-              : `Registre as quantidades produzidas e clique em "Concluir"`}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ ...T.bodyB, color: K.text }}>
+              {locked ? "Ciclo concluído" : "Ciclo aberto para edição"}
+            </div>
+            <div style={{ ...T.small, color: K.muted, marginTop: 2 }}>
+              {locked
+                ? <>Reabre em <span style={T.mono}>{formatCountdown(nextCycleStart - now)}</span> · próximo ciclo às 21h</>
+                : `Registre as quantidades e clique em "Concluir"`}
+            </div>
           </div>
+          {locked && <Btn kind="secondary" size="sm" onClick={reabrir}>Reabrir</Btn>}
         </div>
-        {locked && (
-          <button onClick={reabrir} style={{ ...actionBtn("#888"), fontSize: 11, padding: "6px 12px" }}>Reabrir</button>
-        )}
-      </div>
+      </Card>
 
       {belowMin.length > 0 && !locked && (
-        <div style={{ ...cardStyle, padding: "10px 14px", marginBottom: 14, borderLeft: "3px solid #ef4444", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 14 }}>⚠️</span>
-          <span style={{ fontSize: 12, color: "#f87171" }}>{belowMin.length} {belowMin.length === 1 ? "item abaixo" : "itens abaixo"} da quantidade mínima</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", marginBottom: 12, background: `${K.err}1A`, border: `1px solid ${K.err}55`, borderRadius: 10, color: K.err, ...T.small, fontWeight: 600 }}>
+          <Icon name="alert" size={16} />
+          {belowMin.length} {belowMin.length === 1 ? "item abaixo" : "itens abaixo"} da quantidade mínima
         </div>
       )}
 
-      {sorted.map(item => {
-        const q = visibleQty(item);
-        const filled = q != null;
-        const alert = filled && q < (item.minQty || 0);
-        return (
-          <div key={item.id} style={{ ...cardStyle, marginBottom: 8, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, borderLeft: alert ? "3px solid #ef4444" : "3px solid transparent" }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#ddd" }}>{item.name}</div>
-              <div style={{ fontSize: 11, color: alert ? "#f87171" : "#555", marginTop: 2 }}>
-                {alert ? `⚠️ Abaixo do mínimo (${item.minQty} ${item.unit})` : `Mínimo: ${item.minQty || 0} ${item.unit}`}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {sorted.map(item => {
+          const q = visibleQty(item);
+          const filled = q != null;
+          const isAlert = filled && q < (item.minQty || 0);
+          return (
+            <div key={item.id} style={{
+              background: K.surface, border: `1px solid ${K.border}`, borderRadius: 12,
+              padding: "12px 14px", display: "flex", alignItems: "center", gap: 12,
+              position: "relative", overflow: "hidden",
+            }}>
+              {isAlert && <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: K.err }} />}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ ...T.bodyB, color: K.text }}>{item.name}</div>
+                <div style={{ ...T.small, color: isAlert ? K.err : K.muted, marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
+                  {isAlert && <Icon name="alert" size={12} />}
+                  {isAlert ? `Abaixo do mínimo (${item.minQty} ${item.unit})` : `Mínimo: ${item.minQty || 0} ${item.unit}`}
+                </div>
               </div>
+              {locked ? (
+                <div style={{ ...T.mono, fontSize: 16, fontWeight: 700, color: isAlert ? K.err : K.green, minWidth: 80, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                  {filled ? `${q} ${item.unit}` : "—"}
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={getDraft(item)}
+                    onChange={e => setDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                    onBlur={() => saveDraft(item)}
+                    onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                    placeholder="0"
+                    onFocus={e => { e.currentTarget.style.borderColor = K.orange; }}
+                    style={{ width: 80, background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 8, padding: "8px 10px", color: K.text, fontFamily: MONO, fontSize: 15, fontWeight: 600, textAlign: "right", outline: "none" }}
+                  />
+                  <div style={{ ...T.small, color: K.muted, minWidth: 32 }}>{item.unit}</div>
+                </>
+              )}
             </div>
-            {locked ? (
-              <div style={{ fontSize: 16, fontWeight: 700, color: alert ? "#f87171" : "#6ee7b7", minWidth: 90, textAlign: "right" }}>
-                {filled ? `${q} ${item.unit}` : "—"}
-              </div>
-            ) : (
-              <>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  value={getDraft(item)}
-                  onChange={e => setDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
-                  onBlur={() => saveDraft(item)}
-                  onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }}
-                  placeholder="0"
-                  style={{ ...inputBase, width: 90, textAlign: "right", fontSize: 15, fontWeight: 600 }}
-                />
-                <div style={{ fontSize: 12, color: "#666", minWidth: 34 }}>{item.unit}</div>
-              </>
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
 
       {!locked && (
-        <button
-          onClick={concluir}
-          disabled={!allFilled}
-          style={{
-            width: "100%", marginTop: 16, padding: "12px 20px", borderRadius: 10,
-            border: "1px solid " + (allFilled ? "#6ee7b7" : "#2a2a3a"),
-            background: allFilled ? "#34d39918" : "#13131e",
-            color: allFilled ? "#6ee7b7" : "#555",
-            fontSize: 14, fontWeight: 600, cursor: allFilled ? "pointer" : "not-allowed",
-            fontFamily: "inherit",
-          }}
-        >
-          ✓ Concluir ciclo de hoje
-        </button>
+        <div style={{ marginTop: 16 }}>
+          <Btn kind={allFilled ? "success" : "secondary"} size="lg" full disabled={!allFilled} icon="check-bold" onClick={concluir}>
+            Concluir ciclo de hoje
+          </Btn>
+        </div>
       )}
     </div>
   );
@@ -1461,56 +1639,83 @@ function ProductionManageView({ items, onAdd, onUpdate, onRemove }) {
     onRemove(id);
   };
 
+  const inputStyle = {
+    width: "100%", background: K.surface2, border: `1px solid ${K.border}`,
+    borderRadius: 10, padding: "10px 12px", color: K.text,
+    fontFamily: FONT, fontSize: 14, outline: "none",
+  };
+
   return (
-    <div className="anim" style={{ padding: "20px 28px", maxWidth: 720, margin: "0 auto" }}>
-      <div style={{ ...cardStyle, marginBottom: 20, padding: 20 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 14 }}>Adicionar item de produção</div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div style={{ flex: "1 1 200px" }}>
-            <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Nome</label>
-            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Mix de vegetais" style={{ ...inputBase, width: "100%" }} />
+    <div className="kuali-anim" style={{ padding: "20px 16px 32px", maxWidth: 720, margin: "0 auto", fontFamily: FONT }}>
+      <Card padding={18} style={{ marginBottom: 18 }}>
+        <div style={{ ...T.caption, color: K.muted, marginBottom: 14 }}>ADICIONAR ITEM DE PRODUÇÃO</div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12, marginBottom: 14 }}>
+          <div>
+            <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Nome</label>
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Mix de vegetais"
+              onFocus={e => { e.currentTarget.style.borderColor = K.orange; }}
+              onBlur={e => { e.currentTarget.style.borderColor = K.border; }}
+              style={inputStyle} />
           </div>
-          <div style={{ flex: "0 0 90px" }}>
-            <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Unidade</label>
-            <input value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} placeholder="und" style={{ ...inputBase, width: "100%" }} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Unidade</label>
+              <input value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} placeholder="und"
+                onFocus={e => { e.currentTarget.style.borderColor = K.orange; }}
+                onBlur={e => { e.currentTarget.style.borderColor = K.border; }}
+                style={inputStyle} />
+            </div>
+            <div>
+              <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Qtd. mínima</label>
+              <input type="number" value={form.minQty} onChange={e => setForm({ ...form, minQty: e.target.value })} placeholder="0"
+                onFocus={e => { e.currentTarget.style.borderColor = K.orange; }}
+                onBlur={e => { e.currentTarget.style.borderColor = K.border; }}
+                style={{ ...inputStyle, fontFamily: MONO }} />
+            </div>
           </div>
-          <div style={{ flex: "0 0 110px" }}>
-            <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Qtd. mínima</label>
-            <input type="number" value={form.minQty} onChange={e => setForm({ ...form, minQty: e.target.value })} placeholder="0" style={{ ...inputBase, width: "100%" }} />
-          </div>
-          <button onClick={save} style={{ ...actionBtn("#6ee7b7"), fontWeight: 600, padding: "8px 20px" }}>+ Adicionar</button>
         </div>
-      </div>
+        <Btn kind="primary" icon="plus" onClick={save}>Adicionar item</Btn>
+      </Card>
 
       {sorted.length === 0 && (
-        <div style={{ textAlign: "center", padding: "40px 20px" }}>
-          <div style={{ fontSize: 36, marginBottom: 10, opacity: 0.2 }}>📋</div>
-          <p style={{ fontSize: 13, color: "#555" }}>Nenhum item cadastrado</p>
-        </div>
+        <Card padding={32} style={{ textAlign: "center" }}>
+          <div style={{ width: 48, height: 48, borderRadius: 14, background: K.surface2, color: K.muted, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+            <Icon name="box" size={22} />
+          </div>
+          <div style={{ ...T.bodyB, color: K.text }}>Nenhum item cadastrado</div>
+        </Card>
       )}
 
-      {sorted.map(i => (
-        <div key={i.id} style={{ ...cardStyle, marginBottom: 8, padding: "12px 16px" }}>
-          {editId === i.id ? (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} style={{ ...inputBase, flex: "1 1 180px" }} />
-              <input value={editForm.unit} onChange={e => setEditForm({ ...editForm, unit: e.target.value })} style={{ ...inputBase, width: 70 }} />
-              <input type="number" value={editForm.minQty} onChange={e => setEditForm({ ...editForm, minQty: e.target.value })} style={{ ...inputBase, width: 90 }} />
-              <button onClick={saveEdit} style={{ ...actionBtn("#6ee7b7"), fontSize: 11, padding: "6px 12px" }}>Salvar</button>
-              <button onClick={() => setEditId(null)} style={{ ...actionBtn("#888"), fontSize: 11, padding: "6px 12px" }}>Cancelar</button>
-            </div>
-          ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#ddd" }}>{i.name}</div>
-                <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>Mínimo: {i.minQty || 0} {i.unit}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {sorted.map(i => (
+          <div key={i.id} style={{ background: K.surface, border: `1px solid ${K.border}`, borderRadius: 12, padding: "12px 14px" }}>
+            {editId === i.id ? (
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8 }}>
+                <input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} style={inputStyle} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <input value={editForm.unit} onChange={e => setEditForm({ ...editForm, unit: e.target.value })} style={inputStyle} />
+                  <input type="number" value={editForm.minQty} onChange={e => setEditForm({ ...editForm, minQty: e.target.value })} style={{ ...inputStyle, fontFamily: MONO }} />
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <Btn kind="primary" size="sm" icon="check" onClick={saveEdit}>Salvar</Btn>
+                  <Btn kind="secondary" size="sm" icon="x" onClick={() => setEditId(null)}>Cancelar</Btn>
+                </div>
               </div>
-              <button onClick={() => startEdit(i)} style={{ ...actionBtn("#38bdf8"), fontSize: 11, padding: "6px 12px" }}>Editar</button>
-              <button onClick={() => remove(i.id)} style={{ ...actionBtn("#ef4444"), fontSize: 11, padding: "6px 12px" }}>Remover</button>
-            </div>
-          )}
-        </div>
-      ))}
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ flex: "1 1 160px", minWidth: 0 }}>
+                  <div style={{ ...T.bodyB, color: K.text }}>{i.name}</div>
+                  <div style={{ ...T.small, color: K.muted, marginTop: 2 }}>Mínimo: <span style={T.mono}>{i.minQty || 0} {i.unit}</span></div>
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <Btn kind="secondary" size="sm" icon="edit" onClick={() => startEdit(i)}>Editar</Btn>
+                  <Btn kind="ghost" size="sm" icon="trash" onClick={() => remove(i.id)} style={{ color: K.err }}>Remover</Btn>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -2327,19 +2532,19 @@ export default function App() {
       {/* TAB: PRODUÇÃO */}
       {section === "producao" && producaoTab === "controle" && <ProductionControlView items={prodItems} cycle={prodCycle} onUpdateItem={updateProdItem} onUpdateCycle={updateProdCycle} />}
       {section === "producao" && producaoTab === "gerenciar" && isAdmin && <ProductionManageView items={prodItems} onAdd={addProdItem} onUpdate={updateProdItem} onRemove={removeProdItem} />}
-      {section === "producao" && producaoTab === "gerenciar" && !isAdmin && (<div style={{ textAlign: "center", padding: "60px 20px" }}><div style={{ fontSize: 44, marginBottom: 12, opacity: 0.2 }}>🔒</div><p style={{ fontSize: 14, color: "#555" }}>Área restrita para administradores</p></div>)}
+      {section === "producao" && producaoTab === "gerenciar" && !isAdmin && <RestrictedArea />}
 
       {/* TAB: FUNCIONÁRIOS */}
       {section === "funcionarios" && isAdmin && <EmployeeManager users={users} onAdd={addUser} onUpdate={updateUser} onRemove={removeUser} />}
-      {section === "funcionarios" && !isAdmin && (<div style={{ textAlign: "center", padding: "60px 20px" }}><div style={{ fontSize: 44, marginBottom: 12, opacity: 0.2 }}>🔒</div><p style={{ fontSize: 14, color: "#555" }}>Área restrita para administradores</p></div>)}
+      {section === "funcionarios" && !isAdmin && <RestrictedArea />}
 
       {/* TAB: CHECKLISTS */}
       {section === "checklists" && checkTab === "fazer" && <ChecklistDo templates={clTemplates} completions={clCompletions} onComplete={addClCompletion} currentUser={currentUser} onPhotoClick={setLightboxSrc} />}
       {section === "checklists" && isAdmin && checkTab === "analise" && <ChecklistAnalysis completions={clCompletions} users={users} onPhotoClick={setLightboxSrc} />}
       {section === "checklists" && isAdmin && checkTab === "criar" && <ChecklistCreate templates={clTemplates} onAdd={addClTemplate} onUpdate={updateClTemplate} onRemove={removeClTemplate} />}
-      {section === "checklists" && !isAdmin && checkTab !== "fazer" && (<div style={{ textAlign: "center", padding: "60px 20px" }}><div style={{ fontSize: 44, marginBottom: 12, opacity: 0.2 }}>🔒</div><p style={{ fontSize: 14, color: "#555" }}>Área restrita para administradores</p></div>)}
+      {section === "checklists" && !isAdmin && checkTab !== "fazer" && <RestrictedArea />}
 
-      {!isAdmin && section === "compras" && (<div style={{ textAlign: "center", padding: "60px 20px" }}><div style={{ fontSize: 44, marginBottom: 12, opacity: 0.2 }}>🔒</div><p style={{ fontSize: 14, color: "#555" }}>Área restrita para administradores</p></div>)}
+      {!isAdmin && section === "compras" && <RestrictedArea />}
 
       <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       {showReminders && <RemindersModal reminders={reminders} currentUser={currentUser} onAdd={addReminder} onRemove={removeReminder} onClose={() => setShowReminders(false)} />}
