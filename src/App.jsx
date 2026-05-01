@@ -1952,6 +1952,19 @@ export default function App() {
     if (!currentUser) return;
     fetch("/api/bootstrap").then(r => r.json()).then(d => {
       setUsers(d.users || []);
+      // Se o servidor retornou erro (ex: DATABASE_URL não setada), bootstrap
+      // vem como { error: "..." } sem os campos esperados. Detecta e cai pro
+      // fallback de fetches individuais — pelo menos /api/users tipicamente
+      // ainda funciona se o login funcionou.
+      if (d && d.error) {
+        console.error("Bootstrap retornou erro:", d.error);
+        // Fallback parcial: tenta pelo menos buscar users isoladamente
+        fetch("/api/users").then(r => r.json()).then(u => {
+          if (Array.isArray(u)) setUsers(u);
+        }).catch(() => { });
+        setDataLoaded(true);
+        return;
+      }
       setItems(d.items || []);
       setCatalog(d.catalog || []);
       setClTemplates(d.clTemplates || []);
@@ -1971,7 +1984,13 @@ export default function App() {
           }).catch(() => { });
         }, 500);
       }
-    }).catch(err => console.error("Erro ao carregar dados:", err));
+    }).catch(err => {
+      console.error("Falha ao carregar bootstrap:", err);
+      // Mesmo com bootstrap falhando, tenta /api/users isoladamente
+      fetch("/api/users").then(r => r.json()).then(u => {
+        if (Array.isArray(u)) setUsers(u);
+      }).catch(() => { });
+    });
   }, [currentUser]);
 
   // ── Sync checklist data across devices (poll every 30s) ──
@@ -2013,6 +2032,16 @@ export default function App() {
     return () => clearInterval(t);
   }, [currentUser, section, refreshProduction]);
 
+  // Refetch users ao entrar na aba "funcionarios" — defesa caso bootstrap
+  // tenha falhado ou o admin tenha cadastrado novos funcionários em outro
+  // dispositivo.
+  useEffect(() => {
+    if (!currentUser || section !== "funcionarios") return;
+    fetch("/api/users").then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setUsers(data);
+    }).catch(() => { });
+  }, [currentUser, section]);
+
   // Detecta mobile pra colapsar elementos do header (texto do usuário, label "Sair").
   // IMPORTANTE: precisa estar ANTES do early-return — caso contrário o número de
   // hooks chamados muda entre Login (não logado) e App (logado), violando a
@@ -2049,7 +2078,7 @@ export default function App() {
     setProdCycle({ cycleKey: null, concludedAt: null });
     setSection("compras");
     setDataLoaded(false);
-    logout();
+    setCurrentUser(null);
   };
 
   // ── API-backed data operations ──
