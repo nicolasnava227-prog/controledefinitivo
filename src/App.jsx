@@ -2013,6 +2013,17 @@ export default function App() {
     return () => clearInterval(t);
   }, [currentUser, section, refreshProduction]);
 
+  // Detecta mobile pra colapsar elementos do header (texto do usuário, label "Sair").
+  // IMPORTANTE: precisa estar ANTES do early-return — caso contrário o número de
+  // hooks chamados muda entre Login (não logado) e App (logado), violando a
+  // Rule of Hooks e crashando o React (tela em branco).
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth < 640 : false);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   // ── LOGIN ──
   if (!currentUser) return <LoginScreen onLogin={setCurrentUser} />;
 
@@ -2216,14 +2227,6 @@ export default function App() {
     fontSize: 13, fontWeight: active ? 600 : 500,
     cursor: "pointer", fontFamily: FONT, transition: "all 150ms ease", whiteSpace: "nowrap",
   });
-
-  // Detecta mobile pra colapsar elementos do header (texto do usuário, label "Sair")
-  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth < 640 : false);
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 640);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
 
   return (
     <div style={{ minHeight: "100vh", background: K.ink, fontFamily: FONT, color: K.text }}>
