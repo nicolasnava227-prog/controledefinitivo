@@ -148,39 +148,51 @@ function RemindersModal({ reminders, currentUser, onAdd, onRemove, onClose }) {
   const submit = () => { if (!text.trim()) return; onAdd(text); setText(""); };
   const fmtTime = ts => { const d = new Date(ts); return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#0c0c14", borderRadius: 16, border: "1px solid #1e1e2e", padding: "24px 24px 20px", width: "100%", maxWidth: 480, maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 22 }}>🔔</span>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>Lembretes</div>
-              <div style={{ fontSize: 10, color: "#4a4a5a", letterSpacing: 1.5, textTransform: "uppercase" }}>{reminders.length} {reminders.length === 1 ? "aviso ativo" : "avisos ativos"}</div>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.78)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, fontFamily: FONT }} className="kuali-anim">
+      <div onClick={e => e.stopPropagation()} style={{ background: K.surface, borderRadius: 16, border: `1px solid ${K.border}`, padding: 22, width: "100%", maxWidth: 480, maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: `${K.orange}1A`, color: K.orange, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Icon name="bell" size={20} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ ...T.h3, color: K.text }}>Lembretes</div>
+              <div style={{ ...T.caption, color: K.muted, marginTop: 2 }}>{reminders.length} {reminders.length === 1 ? "AVISO ATIVO" : "AVISOS ATIVOS"}</div>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer", opacity: 0.6 }}>✕</button>
+          <button onClick={onClose} aria-label="Fechar"
+            style={{ width: 36, height: 36, borderRadius: 10, background: K.surface2, border: `1px solid ${K.border}`, color: K.text2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Icon name="x" size={18} />
+          </button>
         </div>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-          <input value={text} onChange={e => setText(e.target.value)} placeholder="Ex: Fazer frango amanhã cedo..."
+          <input value={text} onChange={e => setText(e.target.value)} placeholder="Ex: Fazer frango amanhã cedo…"
             onKeyDown={e => e.key === "Enter" && submit()}
-            style={{ ...inputBase, flex: 1, borderRadius: 8 }} />
-          <button onClick={submit} style={{ ...actionBtn("#6ee7b7"), fontWeight: 600 }}>+ Adicionar</button>
+            onFocus={e => { e.currentTarget.style.borderColor = K.orange; }}
+            onBlur={e => { e.currentTarget.style.borderColor = K.border; }}
+            style={{ flex: 1, background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 10, padding: "10px 12px", color: K.text, fontFamily: FONT, fontSize: 14, outline: "none", transition: "border-color 120ms ease", minWidth: 0 }} />
+          <Btn kind="primary" size="md" icon="plus" onClick={submit}>Adicionar</Btn>
         </div>
 
-        <div style={{ overflowY: "auto", flex: 1 }}>
+        <div style={{ overflowY: "auto", flex: 1, marginRight: -6, paddingRight: 6 }}>
           {reminders.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "28px 10px", color: "#3a3a4a", fontSize: 13 }}>Nenhum lembrete ativo.</div>
+            <div style={{ textAlign: "center", padding: "32px 10px", color: K.muted, ...T.small }}>Nenhum lembrete ativo.</div>
           ) : reminders.map(r => {
             const mine = r.authorId === currentUser.id;
             return (
-              <div key={r.id} style={{ padding: "12px 14px", background: "#08080c", borderRadius: 10, border: "1px solid #13131e", marginBottom: 8, display: "flex", gap: 10, alignItems: "flex-start" }}>
-                <span style={{ fontSize: 14, marginTop: 1 }}>📌</span>
+              <div key={r.id} style={{ padding: "12px 14px", background: K.surface2, borderRadius: 10, border: `1px solid ${K.border}`, marginBottom: 8, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <Icon name="pin" size={14} color={K.orange} style={{ marginTop: 2, flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: "#ddd", wordBreak: "break-word", marginBottom: 4 }}>{r.text}</div>
-                  <div style={{ fontSize: 10, color: "#4a4a5a" }}>{r.authorName}{mine ? " (você)" : ""} · {fmtTime(r.timestamp)}</div>
+                  <div style={{ ...T.body, fontSize: 14, color: K.text, wordBreak: "break-word", marginBottom: 4 }}>{r.text}</div>
+                  <div style={{ ...T.small, fontSize: 11, color: K.muted }}>{r.authorName}{mine ? " (você)" : ""} · {fmtTime(r.timestamp)}</div>
                 </div>
-                <button onClick={() => onRemove(r.id)} title="Remover" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, opacity: 0.35 }} onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = 0.35}>🗑️</button>
+                <button onClick={() => onRemove(r.id)} title="Remover"
+                  style={{ background: "transparent", border: "none", cursor: "pointer", color: K.muted, padding: 4, display: "flex" }}
+                  onMouseEnter={e => e.currentTarget.style.color = K.err}
+                  onMouseLeave={e => e.currentTarget.style.color = K.muted}>
+                  <Icon name="trash" size={16} />
+                </button>
               </div>
             );
           })}
@@ -191,13 +203,16 @@ function RemindersModal({ reminders, currentUser, onAdd, onRemove, onClose }) {
 }
 
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #222; border-radius: 3px; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2A2A30; border-radius: 3px; }
+  /* Horizontal scroll de tabs sem barra visível */
+  div[style*="overflowX"]::-webkit-scrollbar, div[style*="overflow-x"]::-webkit-scrollbar { display: none; }
   @keyframes slideUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
   @keyframes spin { to { transform:rotate(360deg); } }
   .anim { animation: slideUp 0.3s ease-out forwards; }
-  input:focus, select:focus { outline: 1px solid #34d39955; outline-offset: -1px; }
+  input:focus, select:focus, textarea:focus { outline: none; }
 `;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -493,49 +508,110 @@ function CatalogView({ catalog, onAdd, onUpdate, onRemove }) {
   const filtered = catalog.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()));
   const grouped = CATEGORIES.reduce((acc, cat) => { const items = filtered.filter(p => p.category === cat); if (items.length) acc.push({ cat, items }); return acc; }, []);
 
+  const inputStyle = {
+    width: "100%", background: K.surface2, border: `1px solid ${K.border}`,
+    borderRadius: 10, padding: "10px 12px", color: K.text,
+    fontFamily: FONT, fontSize: 14, outline: "none",
+  };
+
   return (
-    <div style={{ padding: "20px 28px", maxWidth: 800, margin: "0 auto" }}>
-      <div style={{ ...cardStyle, padding: "16px 20px", marginBottom: 16, borderLeftWidth: 3, borderLeftColor: "#34d399" }}>
-        <div style={{ fontSize: 13, color: "#6ee7b7", fontWeight: 600, marginBottom: 6 }}>Como funciona a padronização?</div>
-        <p style={{ fontSize: 12, color: "#888", lineHeight: 1.6 }}>
-          Cadastre o nome padrão (ex: <span style={{ color: "#ddd" }}>"Frango"</span>). A IA reconhece automaticamente variações como <span style={{ color: "#777", fontStyle: "italic" }}>"FGO INTEIRO", "FRANGO CONG"</span> e registra como <span style={{ color: "#6ee7b7" }}>"Frango"</span>.
-        </p>
-      </div>
-      <div style={{ ...cardStyle, padding: 20, marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div style={{ flex: "1 1 260px" }}>
-            <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Nome padrão do produto</label>
-            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ex: Frango, Arroz..." style={{ ...inputBase, width: "100%" }} onKeyDown={e => e.key === "Enter" && addOrUpdate()} />
+    <div className="kuali-anim" style={{ padding: "20px 16px 32px", maxWidth: 880, margin: "0 auto", fontFamily: FONT }}>
+      {/* Educational callout */}
+      <Card padding={16} style={{ marginBottom: 16, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: K.orange }} />
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: `${K.orange}1A`, color: K.orange, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Icon name="sparkle" size={18} />
           </div>
-          <div style={{ flex: "0 0 200px" }}>
-            <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>Categoria</label>
-            <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} style={{ ...inputBase, width: "100%" }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ ...T.bodyB, color: K.text, marginBottom: 4 }}>Como funciona a padronização?</div>
+            <p style={{ ...T.small, color: K.text2, lineHeight: 1.6 }}>
+              Cadastre o nome padrão (ex: <span style={{ color: K.text, fontWeight: 600 }}>"Frango"</span>). A IA reconhece variações como <span style={{ color: K.muted, fontStyle: "italic" }}>"FGO INTEIRO"</span> e <span style={{ color: K.muted, fontStyle: "italic" }}>"FRANGO CONG"</span> e registra como <span style={{ color: K.orange, fontWeight: 600 }}>"Frango"</span>.
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Add / edit form */}
+      <Card padding={18} style={{ marginBottom: 16 }}>
+        <div style={{ ...T.caption, color: K.muted, marginBottom: 14 }}>
+          {editId ? "EDITAR PRODUTO" : "ADICIONAR PRODUTO"}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12, marginBottom: 12 }}>
+          <div>
+            <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Nome padrão do produto</label>
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ex: Frango, Arroz…"
+              onKeyDown={e => e.key === "Enter" && addOrUpdate()}
+              onFocus={e => { e.currentTarget.style.borderColor = K.orange; }}
+              onBlur={e => { e.currentTarget.style.borderColor = K.border; }}
+              style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Categoria</label>
+            <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} style={inputStyle}>
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          <button onClick={addOrUpdate} style={{ ...actionBtn("#6ee7b7"), fontWeight: 600 }}>{editId ? "Salvar" : "+ Adicionar"}</button>
-          {editId && <button onClick={() => { setEditId(null); setForm({ name: "", category: CATEGORIES[0] }); }} style={actionBtn("#888")}>Cancelar</button>}
         </div>
-      </div>
-      {catalog.length > 0 && <input placeholder="Buscar no catálogo..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inputBase, width: "100%", marginBottom: 14, borderRadius: 10 }} />}
-      {catalog.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#444" }}>Nenhum produto cadastrado</div>}
-      {grouped.map(({ cat, items }) => (
-        <div key={cat} style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <Icon name={CAT_ICON[cat]} size={14} color={CAT_COLOR[cat]} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: CAT_COLOR[cat], textTransform: "uppercase", letterSpacing: 1.5 }}>{cat}</span>
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {items.map(p => (
-              <div key={p.id} style={{ ...cardStyle, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 14, fontWeight: 500, color: "#ddd" }}>{p.name}</span>
-                <button onClick={() => { setEditId(p.id); setForm({ name: p.name, category: p.category }); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, opacity: 0.35 }} onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = 0.35}>✏️</button>
-                <button onClick={() => onRemove(p.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, opacity: 0.35 }} onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = 0.35}>🗑️</button>
-              </div>
-            ))}
-          </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Btn kind="primary" icon={editId ? "check" : "plus"} onClick={addOrUpdate}>{editId ? "Salvar alterações" : "Adicionar"}</Btn>
+          {editId && <Btn kind="secondary" icon="x" onClick={() => { setEditId(null); setForm({ name: "", category: CATEGORIES[0] }); }}>Cancelar</Btn>}
         </div>
-      ))}
+      </Card>
+
+      {catalog.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: K.surface2, padding: "10px 12px", borderRadius: 10, border: `1px solid ${K.border}`, marginBottom: 16 }}>
+          <Icon name="search" size={16} color={K.muted} />
+          <input placeholder="Buscar no catálogo…" value={search} onChange={e => setSearch(e.target.value)}
+            style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: K.text, fontFamily: FONT, fontSize: 14 }} />
+        </div>
+      )}
+
+      {catalog.length === 0 && (
+        <Card padding={32} style={{ textAlign: "center" }}>
+          <div style={{ width: 48, height: 48, borderRadius: 14, background: K.surface2, color: K.muted, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+            <Icon name="grid" size={22} />
+          </div>
+          <div style={{ ...T.bodyB, color: K.text }}>Nenhum produto cadastrado</div>
+          <div style={{ ...T.small, color: K.muted, marginTop: 4 }}>Adicione produtos pra a IA reconhecer nas notas fiscais</div>
+        </Card>
+      )}
+
+      {grouped.map(({ cat, items }) => {
+        const color = CAT_COLOR[cat] || K.muted;
+        return (
+          <div key={cat} style={{ marginBottom: 18 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <Icon name={CAT_ICON[cat]} size={14} color={color} />
+              <span style={{ ...T.caption, color, letterSpacing: "0.08em" }}>{cat}</span>
+              <span style={{ ...T.caption, color: K.muted }}>· {items.length}</span>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {items.map(p => (
+                <div key={p.id} style={{
+                  display: "inline-flex", alignItems: "center", gap: 8,
+                  padding: "8px 12px", background: K.surface, borderRadius: 10,
+                  border: `1px solid ${K.border}`,
+                }}>
+                  <span style={{ ...T.body, fontSize: 14, color: K.text, fontWeight: 500 }}>{p.name}</span>
+                  <button onClick={() => { setEditId(p.id); setForm({ name: p.name, category: p.category }); }}
+                    style={{ background: "transparent", border: "none", cursor: "pointer", color: K.muted, padding: 2, display: "flex" }}
+                    onMouseEnter={e => e.currentTarget.style.color = K.text}
+                    onMouseLeave={e => e.currentTarget.style.color = K.muted}>
+                    <Icon name="edit" size={14} />
+                  </button>
+                  <button onClick={() => onRemove(p.id)}
+                    style={{ background: "transparent", border: "none", cursor: "pointer", color: K.muted, padding: 2, display: "flex" }}
+                    onMouseEnter={e => e.currentTarget.style.color = K.err}
+                    onMouseLeave={e => e.currentTarget.style.color = K.muted}>
+                    <Icon name="trash" size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1779,15 +1855,18 @@ export default function App() {
   const hasFilters = period !== "all" || selectedCats.length > 0 || searchText || dateFrom || dateTo;
 
   const mainTab = (active) => ({
-    flex: 1, padding: "14px 0", border: "none",
+    flex: "0 0 auto",
+    minWidth: 96,
+    padding: "12px 14px", border: "none",
     borderBottom: active ? `2px solid ${K.orange}` : "2px solid transparent",
     background: "transparent", color: active ? K.text : K.muted,
-    fontSize: 14, fontWeight: active ? 700 : 500,
+    fontSize: 13, fontWeight: active ? 700 : 500,
     cursor: "pointer", fontFamily: FONT, transition: "all 150ms ease",
-    display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
-    letterSpacing: "-0.005em",
+    display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+    letterSpacing: "-0.005em", whiteSpace: "nowrap",
   });
   const subTab = (active) => ({
+    flexShrink: 0,
     padding: "7px 14px", borderRadius: 8, border: "1px solid",
     borderColor: active ? K.border : "transparent",
     background: active ? K.surface2 : "transparent",
@@ -1796,39 +1875,57 @@ export default function App() {
     cursor: "pointer", fontFamily: FONT, transition: "all 150ms ease", whiteSpace: "nowrap",
   });
 
+  // Detecta mobile pra colapsar elementos do header (texto do usuário, label "Sair")
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth < 640 : false);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   return (
     <div style={{ minHeight: "100vh", background: K.ink, fontFamily: FONT, color: K.text }}>
       <style>{CSS}</style>
 
       {/* HEADER */}
-      <div style={{ background: K.surface, borderBottom: `1px solid ${K.border}` }}>
-        <div style={{ padding: "16px 28px 0", maxWidth: 1400, margin: "0 auto" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
-            <KualiMark size={32} />
-            <div style={{ flex: 1, display: "flex", alignItems: "baseline", gap: 12 }}>
-              <KualiLogo size={22} />
-              <span style={{ ...T.small, color: K.muted }}>{currentUser.name} · {currentUser.role}{isAdmin ? " · Admin" : ""}</span>
+      <div style={{ background: K.surface, borderBottom: `1px solid ${K.border}`, position: "sticky", top: 0, zIndex: 50 }}>
+        <div style={{ padding: isMobile ? "10px 14px 0" : "16px 28px 0", maxWidth: 1400, margin: "0 auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 14, marginBottom: isMobile ? 8 : 14 }}>
+            <KualiMark size={isMobile ? 28 : 32} />
+            <div style={{ flex: 1, display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "baseline", gap: isMobile ? 0 : 12, minWidth: 0 }}>
+              <KualiLogo size={isMobile ? 18 : 22} />
+              <span style={{ ...T.small, color: K.muted, fontSize: isMobile ? 11 : 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
+                {isMobile ? currentUser.name.split(" ")[0] : `${currentUser.name} · ${currentUser.role}${isAdmin ? " · Admin" : ""}`}
+              </span>
             </div>
             <button onClick={() => setShowReminders(true)} title="Lembretes"
-              style={{ position: "relative", background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 10, width: 40, height: 40, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: K.text2 }}>
+              style={{ position: "relative", background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 10, width: 40, height: 40, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: K.text2, flexShrink: 0 }}>
               <Icon name="bell" size={18} />
               {reminders.length > 0 && (
                 <span style={{ position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: K.orange, color: K.black, fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT }}>{reminders.length}</span>
               )}
             </button>
-            <Btn kind="secondary" size="sm" icon="signout" onClick={() => setCurrentUser(null)}>Sair</Btn>
+            {isMobile ? (
+              <button onClick={() => setCurrentUser(null)} aria-label="Sair"
+                style={{ width: 40, height: 40, borderRadius: 10, background: K.surface2, border: `1px solid ${K.border}`, color: K.text2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Icon name="signout" size={18} />
+              </button>
+            ) : (
+              <Btn kind="secondary" size="sm" icon="signout" onClick={() => setCurrentUser(null)}>Sair</Btn>
+            )}
           </div>
-          <div style={{ display: "flex" }}>
-            {isAdmin && <button onClick={() => setSection("compras")} style={mainTab(section === "compras")}><Icon name="receipt" size={16} color={section === "compras" ? K.orange : K.muted} /> Compras</button>}
-            <button onClick={() => setSection("checklists")} style={mainTab(section === "checklists")}><Icon name="list" size={16} color={section === "checklists" ? K.orange : K.muted} /> Check-Lists</button>
-            <button onClick={() => setSection("producao")} style={mainTab(section === "producao")}><Icon name="box" size={16} color={section === "producao" ? K.orange : K.muted} /> Produção</button>
-            <button onClick={() => setSection("funcionarios")} style={mainTab(section === "funcionarios")}><Icon name="user" size={16} color={section === "funcionarios" ? K.orange : K.muted} /> Funcionários</button>
+          {/* Tabs com scroll horizontal no mobile */}
+          <div style={{ display: "flex", overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none", margin: isMobile ? "0 -14px" : 0, paddingLeft: isMobile ? 14 : 0, paddingRight: isMobile ? 14 : 0 }}>
+            {isAdmin && <button onClick={() => setSection("compras")} style={mainTab(section === "compras")}><Icon name="receipt" size={15} color={section === "compras" ? K.orange : K.muted} /> Compras</button>}
+            <button onClick={() => setSection("checklists")} style={mainTab(section === "checklists")}><Icon name="list" size={15} color={section === "checklists" ? K.orange : K.muted} /> Checklists</button>
+            <button onClick={() => setSection("producao")} style={mainTab(section === "producao")}><Icon name="box" size={15} color={section === "producao" ? K.orange : K.muted} /> Produção</button>
+            <button onClick={() => setSection("funcionarios")} style={mainTab(section === "funcionarios")}><Icon name="user" size={15} color={section === "funcionarios" ? K.orange : K.muted} /> Equipe</button>
           </div>
         </div>
       </div>
 
-      {/* SUB-NAVIGATION */}
-      <div style={{ padding: "12px 28px", borderBottom: `1px solid ${K.border}`, display: "flex", gap: 6, alignItems: "center", maxWidth: 1400, margin: "0 auto", width: "100%" }}>
+      {/* SUB-NAVIGATION (também scroll horizontal no mobile) */}
+      <div style={{ padding: isMobile ? "10px 14px" : "12px 28px", borderBottom: `1px solid ${K.border}`, display: "flex", gap: 6, alignItems: "center", maxWidth: 1400, margin: "0 auto", width: "100%", overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none" }}>
         {section === "compras" && isAdmin && (
           <>
             <button onClick={() => setComprasTab("notas")} style={subTab(comprasTab === "notas")}>Notas fiscais</button>
@@ -1864,26 +1961,26 @@ export default function App() {
       {isAdmin && section === "compras" && (comprasTab === "notas" || comprasTab === "resumo") && (
         <div className="kuali-anim" style={{ maxWidth: 1400, margin: "0 auto" }}>
           {/* Page header */}
-          <div style={{ padding: "24px 28px 20px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-            <div>
+          <div style={{ padding: isMobile ? "18px 16px 14px" : "24px 28px 20px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            <div style={{ minWidth: 0 }}>
               <div style={{ ...T.caption, color: K.orange }}>COMPRAS</div>
-              <div style={{ ...T.h1, color: K.text, marginTop: 6, fontSize: 28 }}>{comprasTab === "notas" ? "Notas fiscais" : "Resumo do período"}</div>
-              <div style={{ ...T.body, color: K.text2, marginTop: 4 }}>
+              <div style={{ ...T.h1, color: K.text, marginTop: 6, fontSize: isMobile ? 22 : 28 }}>{comprasTab === "notas" ? "Notas fiscais" : "Resumo do período"}</div>
+              <div style={{ ...T.body, color: K.text2, marginTop: 4, fontSize: isMobile ? 13 : 15 }}>
                 {filteredItems.length} {filteredItems.length === 1 ? "item" : "itens"}
                 {filteredItems.length > 0 && <> · <span style={{ ...T.mono, color: K.text }}>{formatBRL(totalGeral)}</span></>}
               </div>
             </div>
             {filteredItems.length > 0 && comprasTab === "notas" && (
-              <div style={{ display: "flex", gap: 10 }}>
-                <Btn kind="secondary" icon="upload" onClick={() => downloadCSV(filteredItems)}>Exportar CSV</Btn>
-                <Btn kind="primary" icon="upload" onClick={() => fileRef.current?.click()}>Lançar nota</Btn>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {!isMobile && <Btn kind="secondary" icon="upload" onClick={() => downloadCSV(filteredItems)}>Exportar CSV</Btn>}
+                <Btn kind="primary" size={isMobile ? "sm" : "md"} icon="upload" onClick={() => fileRef.current?.click()}>{isMobile ? "Lançar" : "Lançar nota"}</Btn>
               </div>
             )}
           </div>
 
           {/* Filters */}
           {items.length > 0 && (
-            <div style={{ padding: "0 28px 14px" }}>
+            <div style={{ padding: isMobile ? "0 16px 12px" : "0 28px 14px" }}>
               <Card padding={16}>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
                   <span style={{ ...T.caption, color: K.muted, marginRight: 6 }}>Período</span>
@@ -1956,22 +2053,22 @@ export default function App() {
 
           {/* Stat cards */}
           {filteredItems.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, padding: "8px 28px 14px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(220px, 1fr))", gap: isMobile ? 10 : 14, padding: isMobile ? "8px 16px 12px" : "8px 28px 14px" }}>
               {[
                 { label: "TOTAL GASTO", value: formatBRL(totalGeral), mono: true },
                 { label: "ITENS", value: filteredItems.length, mono: true },
                 { label: "CATEGORIAS", value: Object.keys(categoryTotals).length, mono: true },
                 { label: "FORNECEDORES", value: [...new Set(filteredItems.map(i => i.supplier).filter(Boolean))].length, mono: true },
               ].map(s => (
-                <Card key={s.label} padding={18}>
-                  <div style={{ ...T.caption, color: K.muted }}>{s.label}</div>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: K.text, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums", marginTop: 8, fontFamily: s.mono ? MONO : FONT }}>{s.value}</div>
+                <Card key={s.label} padding={isMobile ? 12 : 18}>
+                  <div style={{ ...T.caption, color: K.muted, fontSize: isMobile ? 10 : 11 }}>{s.label}</div>
+                  <div style={{ fontSize: isMobile ? 20 : 28, fontWeight: 700, color: K.text, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums", marginTop: 8, fontFamily: s.mono ? MONO : FONT, wordBreak: "break-word" }}>{s.value}</div>
                 </Card>
               ))}
             </div>
           )}
 
-          <div style={{ padding: "0 28px 32px" }}>
+          <div style={{ padding: isMobile ? "0 16px 24px" : "0 28px 32px" }}>
             {/* Drop zone (Claude AI) */}
             {comprasTab === "notas" && (
               <Card padding={0} style={{ marginBottom: 16, marginTop: 4, overflow: "hidden" }}>
