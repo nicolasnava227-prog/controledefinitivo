@@ -850,6 +850,8 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
   const [checked, setChecked] = useState({});
   const [photos, setPhotos] = useState({});
   const [saving, setSaving] = useState(false);
+  // Index do item cuja foto está sendo processada agora (dá feedback visual)
+  const [photoLoading, setPhotoLoading] = useState(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -869,6 +871,55 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
 
   const today = todayISO();
 
+  // ── Persistência de rascunho ──
+  // Cada (template, usuário, dia) tem sua própria chave; assim duas pessoas
+  // podem retomar checklists diferentes no mesmo aparelho sem misturar dados.
+  const draftKey = activeId ? `kuali_draft_${activeId}_${currentUser.id}_${today}` : null;
+
+  // Restaura rascunho ao abrir um checklist (ou limpa estado ao trocar)
+  useEffect(() => {
+    if (!activeId || !draftKey) {
+      setChecked({});
+      setPhotos({});
+      return;
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem(draftKey) || "null");
+      setChecked(saved?.checked || {});
+      setPhotos(saved?.photos || {});
+    } catch {
+      setChecked({});
+      setPhotos({});
+    }
+  }, [activeId, draftKey]);
+
+  // Salva rascunho a cada mudança em checked/photos. Se localStorage estourar
+  // quota (muitas fotos pesadas), apenas avisa no console — não trava o user.
+  useEffect(() => {
+    if (!activeId || !draftKey) return;
+    try {
+      localStorage.setItem(draftKey, JSON.stringify({ checked, photos, savedAt: Date.now() }));
+    } catch (err) {
+      console.warn("Não foi possível salvar rascunho do checklist:", err);
+    }
+  }, [activeId, draftKey, checked, photos]);
+
+  // Limpa rascunhos antigos (mais de 2 dias) na montagem do componente
+  useEffect(() => {
+    try {
+      const now = Date.now();
+      const TWO_DAYS = 2 * 24 * 60 * 60 * 1000;
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (!key || !key.startsWith("kuali_draft_")) continue;
+        try {
+          const v = JSON.parse(localStorage.getItem(key));
+          if (!v?.savedAt || now - v.savedAt > TWO_DAYS) localStorage.removeItem(key);
+        } catch { localStorage.removeItem(key); }
+      }
+    } catch { }
+  }, []);
+
   // A checklist is "done today" if completed today by ANY user
   const doneToday = (tplId) => completions.some(c => c.templateId === tplId && c.date === today);
   // Get who completed it today
@@ -879,43 +930,87 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
 
   const startChecklist = (tpl) => {
     setActiveId(tpl.id);
-    setChecked({});
-    setPhotos({});
+    // checked/photos são restaurados pelo useEffect acima
   };
 
+  // Compressor robusto: timeout pra não travar em iOS quando o decode falha
+  // silenciosamente, e detecção mais forte de erro de carregamento.
   const compressImage = (file, maxW = 1024, quality = 0.65) => new Promise((resolve, reject) => {
+    const TIMEOUT_MS = 20000;
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error("Tempo esgotado lendo a foto"));
+    }, TIMEOUT_MS);
+    const settle = (fn) => (...args) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn(...args);
+    };
     const reader = new FileReader();
     reader.onload = ev => {
       const img = new Image();
-      img.onload = () => {
-        const scale = Math.min(1, maxW / img.width);
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
-        const canvas = document.createElement("canvas");
-        canvas.width = w; canvas.height = h;
-        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
-      img.onerror = reject;
+      img.onload = settle(() => {
+        try {
+          const scale = Math.min(1, maxW / img.width);
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+          const canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        } catch (err) { reject(err); }
+      });
+      img.onerror = settle(() => reject(new Error("Não consegui decodificar a imagem (formato pode ser HEIC)")));
       img.src = ev.target.result;
     };
-    reader.onerror = reject;
+    reader.onerror = settle(() => reject(new Error("FileReader falhou")));
+    reader.onabort = settle(() => reject(new Error("Leitura abortada")));
     reader.readAsDataURL(file);
   });
 
+  // iPhone fix: cria input invisível dentro do <body> em vez de detached node.
+  // Em alguns iOS Safari, inputs detached não disparam onchange ou cancelam
+  // antes da imagem ser lida. Apêndice + cleanup garantido + feedback visual.
   const handlePhoto = (itemIdx) => {
+    if (photoLoading !== null) return; // não permite duas leituras simultâneas
     const input = document.createElement("input");
-    input.type = "file"; input.accept = "image/*"; input.capture = "environment";
+    input.type = "file";
+    input.accept = "image/*";
+    input.capture = "environment";
+    input.style.position = "fixed";
+    input.style.top = "-9999px";
+    input.style.left = "-9999px";
+    input.style.opacity = "0";
+    document.body.appendChild(input);
+    const cleanup = () => {
+      try { if (input.parentNode) input.parentNode.removeChild(input); } catch { }
+    };
     input.onchange = async e => {
-      const file = e.target.files[0]; if (!file) return;
+      const file = e.target.files?.[0];
+      if (!file) { cleanup(); return; }
+      setPhotoLoading(itemIdx);
       try {
         const dataUrl = await compressImage(file);
         setPhotos(prev => ({ ...prev, [itemIdx]: [...(prev[itemIdx] || []), dataUrl] }));
-      } catch {
-        alert("Erro ao processar a foto. Tente outra.");
+      } catch (err) {
+        console.error("Erro processando foto:", err);
+        alert("Não consegui processar essa foto.\n\n• Tente tirar de novo (às vezes o iPhone falha)\n• Se persistir, escolha uma da galeria");
+      } finally {
+        setPhotoLoading(null);
+        cleanup();
       }
     };
-    input.click();
+    // Safari iOS às vezes só dispara após focus → usamos requestAnimationFrame
+    requestAnimationFrame(() => {
+      try { input.click(); } catch { cleanup(); }
+    });
+    // Fallback de cleanup se o usuário cancelar (não dispara onchange)
+    setTimeout(() => {
+      if (input.parentNode && !input.files?.length) cleanup();
+    }, 60000);
   };
 
   const removePhoto = (itemIdx, photoIdx) => {
@@ -931,7 +1026,7 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
     const allChecked = tpl.items.every((_, i) => checked[i]);
     const photosOk = tpl.items.every((item, i) => !item.requiresPhoto || (photos[i] && photos[i].length > 0));
     if (!allChecked) return alert("Complete todos os itens antes de finalizar.");
-    if (!photosOk) return alert("Tire foto dos itens obrigatórios (📷).");
+    if (!photosOk) return alert("Tire foto dos itens obrigatórios.");
 
     const comp = {
       id: uid(), templateId: tpl.id, templateTitle: tpl.title, category: tpl.category,
@@ -942,13 +1037,18 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
     };
 
     setSaving(true);
+    const finishUI = () => {
+      // Limpa rascunho local agora que o checklist foi entregue (ou enfileirado)
+      try { if (draftKey) localStorage.removeItem(draftKey); } catch { }
+      setActiveId(null); setChecked({}); setPhotos({});
+    };
     try {
       await onComplete(comp);
-      setActiveId(null); setChecked({}); setPhotos({});
+      finishUI();
     } catch {
       // Já foi salvo no localStorage pelo addClCompletion — vai retransmitir sozinho.
       alert("✅ Checklist salvo no aparelho.\n\nA conexão falhou agora, mas o app vai enviar automaticamente em segundo plano. Pode continuar usando normalmente.");
-      setActiveId(null); setChecked({}); setPhotos({});
+      finishUI();
     } finally {
       setSaving(false);
     }
@@ -986,9 +1086,16 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
             )}
             <div style={{ width: 40 }} />
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
             <Chip icon={catIcon} color={catColor} bg={`${catColor}22`}>{activeTpl.category}</Chip>
             <span style={{ ...T.small, color: K.muted }}>{currentUser.name} · {today}</span>
+            {/* Indicador de rascunho — informa que pode fechar/atualizar sem perder */}
+            {(doneCount > 0 || Object.keys(photos).length > 0) && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: K.green, ...T.small, fontWeight: 700, marginLeft: "auto" }}
+                title="Seu progresso é salvo automaticamente">
+                <Icon name="cloud-check" size={12} /> Rascunho salvo
+              </span>
+            )}
           </div>
           <div style={{ ...T.h1, color: K.text }}>{activeTpl.title}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
@@ -1053,22 +1160,29 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
                               </div>
                             ))}
                           </div>
-                          <button onClick={() => handlePhoto(i)}
-                            style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: K.green, ...T.small, fontWeight: 700, cursor: "pointer", padding: 0 }}>
-                            <Icon name="check-circle" size={14} /> Foto enviada · adicionar mais
+                          <button onClick={() => handlePhoto(i)} disabled={photoLoading === i}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: K.green, ...T.small, fontWeight: 700, cursor: photoLoading === i ? "wait" : "pointer", padding: 0, opacity: photoLoading === i ? 0.6 : 1 }}>
+                            {photoLoading === i
+                              ? <><Icon name="spinner" size={14} spin /> Processando…</>
+                              : <><Icon name="check-circle" size={14} /> Foto enviada · adicionar mais</>}
                           </button>
                         </>
                       ) : (
-                        <button onClick={() => handlePhoto(i)} style={{
+                        <button onClick={() => handlePhoto(i)} disabled={photoLoading === i} style={{
                           height: 44, padding: "0 16px",
                           background: K.surface2,
-                          border: `1px dashed ${K.borderStrong}`,
+                          border: `1px dashed ${photoLoading === i ? K.orange : K.borderStrong}`,
                           borderRadius: 10,
                           color: K.text,
                           display: "inline-flex", alignItems: "center", gap: 8,
-                          fontFamily: FONT, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                          fontFamily: FONT, fontSize: 14, fontWeight: 600,
+                          cursor: photoLoading === i ? "wait" : "pointer",
+                          opacity: photoLoading === i ? 0.7 : 1,
+                          transition: "all 150ms ease",
                         }}>
-                          <Icon name="camera" size={18} color={K.orange} /> Tirar foto obrigatória
+                          {photoLoading === i
+                            ? <><Icon name="spinner" size={18} color={K.orange} spin /> Processando foto…</>
+                            : <><Icon name="camera" size={18} color={K.orange} /> Tirar foto obrigatória</>}
                         </button>
                       )}
                     </div>
@@ -1904,6 +2018,29 @@ export default function App() {
 
   const isAdmin = currentUser.isAdmin;
 
+  // Logout robusto: limpa state e localStorage, forçando volta pra LoginScreen.
+  // É declarado depois do early-return de login pra todos os setters estarem
+  // disponíveis (e não estamos chamando dentro de hook, então pode ser função
+  // comum em vez de useCallback).
+  const logout = () => {
+    try {
+      localStorage.removeItem("kuali_user");
+      // Limpa também caches que poderiam ressuscitar dados do usuário antigo
+      localStorage.removeItem("kuali_bootstrap_cache");
+    } catch { }
+    setItems([]);
+    setUsers([]);
+    setCatalog([]);
+    setClTemplates([]);
+    setClCompletions([]);
+    setReminders([]);
+    setProdItems([]);
+    setProdCycle({ cycleKey: null, concludedAt: null });
+    setSection("compras");
+    setDataLoaded(false);
+    logout();
+  };
+
   // ── API-backed data operations ──
   const api = (url, opts = {}) => fetch(url, { headers: { "Content-Type": "application/json" }, ...opts }).catch(() => { });
   // Reliable POST: throws on failure so caller can react (retry, show error, etc.)
@@ -2111,12 +2248,12 @@ export default function App() {
               )}
             </button>
             {isMobile ? (
-              <button onClick={() => setCurrentUser(null)} aria-label="Sair"
+              <button onClick={() => logout()} aria-label="Sair"
                 style={{ width: 40, height: 40, borderRadius: 10, background: K.surface2, border: `1px solid ${K.border}`, color: K.text2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <Icon name="signout" size={18} />
               </button>
             ) : (
-              <Btn kind="secondary" size="sm" icon="signout" onClick={() => setCurrentUser(null)}>Sair</Btn>
+              <Btn kind="secondary" size="sm" icon="signout" onClick={() => logout()}>Sair</Btn>
             )}
           </div>
           {/* Tabs com scroll horizontal no mobile */}
