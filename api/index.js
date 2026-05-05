@@ -45,6 +45,14 @@ async function init() {
       CREATE INDEX IF NOT EXISTS idx_reminders_timestamp ON reminders(timestamp DESC);
       CREATE INDEX IF NOT EXISTS idx_production_sort ON "productionItems"("sortOrder" ASC, name ASC);
       INSERT INTO users (id, name, username, password, role, "isAdmin") VALUES ('admin', 'Administrador', 'admin', 'admin', 'Gerente', 1) ON CONFLICT (id) DO NOTHING;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS "isCommissioned" INTEGER DEFAULT 0;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS "commissionRate" DOUBLE PRECISION DEFAULT 0;
+      CREATE TABLE IF NOT EXISTS sales (id TEXT PRIMARY KEY, "attendantId" TEXT, "attendantName" TEXT, value DOUBLE PRECISION, note TEXT, date TEXT, time TEXT, timestamp BIGINT, status TEXT DEFAULT 'pending', "approvedBy" TEXT, "approvedAt" TEXT, "rejectionReason" TEXT);
+      CREATE TABLE IF NOT EXISTS "commissionPeriods" (id TEXT PRIMARY KEY, "weekStart" TEXT, "weekEnd" TEXT, snapshot TEXT, "closedBy" TEXT, "closedAt" TEXT);
+      CREATE INDEX IF NOT EXISTS idx_sales_attendant ON sales("attendantId");
+      CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(date DESC);
+      CREATE INDEX IF NOT EXISTS idx_sales_status ON sales(status);
+      CREATE INDEX IF NOT EXISTS idx_periods_weekend ON "commissionPeriods"("weekEnd" DESC);
     `);
   })();
   return initPromise;
@@ -70,24 +78,26 @@ app.post("/api/login", async (req, res) => {
   const r = await exec("SELECT * FROM users WHERE username = ? AND password = ?", [username, password]);
   if (!r.rows.length) return res.status(401).json({ error: "Credenciais inválidas" });
   const u = r.rows[0];
-  res.json({ ...u, isAdmin: bool(u.isAdmin) });
+  res.json({ ...u, isAdmin: bool(u.isAdmin), isCommissioned: bool(u.isCommissioned), commissionRate: Number(u.commissionRate) || 0 });
 });
 
 // ── Users ──
 app.get("/api/users", async (_, res) => {
   const r = await exec("SELECT * FROM users");
-  res.json(r.rows.map(u => ({ ...u, isAdmin: bool(u.isAdmin) })));
+  res.json(r.rows.map(u => ({ ...u, isAdmin: bool(u.isAdmin), isCommissioned: bool(u.isCommissioned), commissionRate: Number(u.commissionRate) || 0 })));
 });
 app.post("/api/users", async (req, res) => {
-  const { id, name, username, password, role, isAdmin } = req.body;
+  const { id, name, username, password, role, isAdmin, isCommissioned, commissionRate } = req.body;
   try {
-    await exec(`INSERT INTO users (id, name, username, password, role, "isAdmin") VALUES (?,?,?,?,?,?)`, [id, name, username, password, role, isAdmin ? 1 : 0]);
+    await exec(`INSERT INTO users (id, name, username, password, role, "isAdmin", "isCommissioned", "commissionRate") VALUES (?,?,?,?,?,?,?,?)`,
+      [id, name, username, password, role, isAdmin ? 1 : 0, isCommissioned ? 1 : 0, Number(commissionRate) || 0]);
     res.json({ ok: true });
   } catch { res.status(400).json({ error: "Usuário já existe" }); }
 });
 app.put("/api/users/:id", async (req, res) => {
-  const { name, username, password, role, isAdmin } = req.body;
-  await exec(`UPDATE users SET name=?, username=?, password=?, role=?, "isAdmin"=? WHERE id=?`, [name, username, password, role, isAdmin ? 1 : 0, req.params.id]);
+  const { name, username, password, role, isAdmin, isCommissioned, commissionRate } = req.body;
+  await exec(`UPDATE users SET name=?, username=?, password=?, role=?, "isAdmin"=?, "isCommissioned"=?, "commissionRate"=? WHERE id=?`,
+    [name, username, password, role, isAdmin ? 1 : 0, isCommissioned ? 1 : 0, Number(commissionRate) || 0, req.params.id]);
   res.json({ ok: true });
 });
 app.delete("/api/users/:id", async (req, res) => {
@@ -227,7 +237,7 @@ app.get("/api/bootstrap", async (_, res) => {
       exec(`SELECT * FROM "productionCycle" WHERE id=1`),
     ]);
     res.json({
-      users: u.rows.map(x => ({ ...x, isAdmin: bool(x.isAdmin) })),
+      users: u.rows.map(x => ({ ...x, isAdmin: bool(x.isAdmin), isCommissioned: bool(x.isCommissioned), commissionRate: Number(x.commissionRate) || 0 })),
       items: i.rows.map(x => ({ ...x, matched: bool(x.matched) })),
       itemsTotal: Number(iCount.rows[0].c),
       catalog: c.rows,
@@ -256,6 +266,104 @@ app.get("/api/cl-completions/:id", async (req, res) => {
     const c = r.rows[0];
     res.json({ ...c, items: JSON.parse(c.items) });
   } catch (err) { res.status(500).json({ error: String(err.message) }); }
+});
+
+// ── Sales / Commission ──
+// Janela da semana corrente (segunda → domingo) usado em summary/close-period.
+function currentWeekRange(d = new Date()) {
+  const day = d.getDay(); // 0 = domingo
+  const diff = (day + 6) % 7; // 0 = segunda
+  const monday = new Date(d); monday.setDate(d.getDate() - diff); monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6); sunday.setHours(23, 59, 59, 999);
+  return { start: monday.toISOString().slice(0, 10), end: sunday.toISOString().slice(0, 10) };
+}
+
+app.get("/api/sales", async (req, res) => {
+  const { status, attendantId, from, to } = req.query;
+  let sql = `SELECT * FROM sales WHERE 1=1`;
+  const args = [];
+  if (status) { sql += ` AND status = ?`; args.push(status); }
+  if (attendantId) { sql += ` AND "attendantId" = ?`; args.push(attendantId); }
+  if (from) { sql += ` AND date >= ?`; args.push(from); }
+  if (to) { sql += ` AND date <= ?`; args.push(to); }
+  sql += ` ORDER BY timestamp DESC`;
+  const r = await exec(sql, args);
+  res.json(r.rows);
+});
+
+app.post("/api/sales", async (req, res) => {
+  const s = req.body;
+  await exec(
+    `INSERT INTO sales (id, "attendantId", "attendantName", value, note, date, time, timestamp, status) VALUES (?,?,?,?,?,?,?,?,?)`,
+    [s.id, s.attendantId, s.attendantName, Number(s.value) || 0, s.note || "", s.date, s.time, s.timestamp, "pending"]
+  );
+  res.json({ ok: true });
+});
+
+app.put("/api/sales/:id", async (req, res) => {
+  // Só atualiza se ainda estiver pending — admin pode forçar usando approve/reject
+  const { value, note } = req.body;
+  await exec(`UPDATE sales SET value=?, note=? WHERE id=? AND status='pending'`,
+    [Number(value) || 0, note || "", req.params.id]);
+  res.json({ ok: true });
+});
+
+app.delete("/api/sales/:id", async (req, res) => {
+  await exec(`DELETE FROM sales WHERE id=? AND status='pending'`, [req.params.id]);
+  res.json({ ok: true });
+});
+
+app.put("/api/sales/:id/approve", async (req, res) => {
+  const { approvedBy } = req.body;
+  await exec(
+    `UPDATE sales SET status='approved', "approvedBy"=?, "approvedAt"=?, "rejectionReason"=NULL WHERE id=?`,
+    [approvedBy || "", new Date().toISOString(), req.params.id]
+  );
+  res.json({ ok: true });
+});
+
+app.put("/api/sales/:id/reject", async (req, res) => {
+  const { reason, rejectedBy } = req.body;
+  await exec(
+    `UPDATE sales SET status='rejected', "approvedBy"=?, "approvedAt"=?, "rejectionReason"=? WHERE id=?`,
+    [rejectedBy || "", new Date().toISOString(), reason || "Sem motivo", req.params.id]
+  );
+  res.json({ ok: true });
+});
+
+app.get("/api/commission/summary", async (_, res) => {
+  const { start, end } = currentWeekRange();
+  const r = await exec(
+    `SELECT "attendantId", "attendantName", status, COALESCE(SUM(value), 0) as total, COUNT(*) as count
+     FROM sales WHERE date >= ? AND date <= ?
+     GROUP BY "attendantId", "attendantName", status`,
+    [start, end]
+  );
+  res.json({
+    weekStart: start,
+    weekEnd: end,
+    breakdown: r.rows.map(x => ({ ...x, total: Number(x.total) || 0, count: Number(x.count) || 0 })),
+  });
+});
+
+app.post("/api/commission/close-period", async (req, res) => {
+  const { closedBy, snapshot } = req.body;
+  const { start, end } = currentWeekRange();
+  const id = `${start}_${end}`;
+  await exec(
+    `INSERT INTO "commissionPeriods" (id, "weekStart", "weekEnd", snapshot, "closedBy", "closedAt") VALUES (?,?,?,?,?,?) ON CONFLICT (id) DO NOTHING`,
+    [id, start, end, JSON.stringify(snapshot || {}), closedBy || "", new Date().toISOString()]
+  );
+  res.json({ ok: true });
+});
+
+app.get("/api/commission/periods", async (_, res) => {
+  const r = await exec(`SELECT * FROM "commissionPeriods" ORDER BY "weekEnd" DESC LIMIT 52`);
+  res.json(r.rows.map(p => {
+    let snapshot = {};
+    try { snapshot = JSON.parse(p.snapshot || "{}"); } catch { }
+    return { ...p, snapshot };
+  }));
 });
 
 // ── Claude API Proxy ──
