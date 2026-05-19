@@ -430,432 +430,8 @@ function LoginScreen({ onLogin }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN: EMPLOYEE MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════════════════════
-// SALES / COMMISSION (atendente + admin)
-// ═══════════════════════════════════════════════════════════════════════════
-
-// Janela da semana corrente (segunda → domingo). Mantida coerente com o backend.
-function currentWeekRangeISO(d = new Date()) {
-  const day = d.getDay();
-  const diff = (day + 6) % 7;
-  const monday = new Date(d); monday.setDate(d.getDate() - diff); monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6); sunday.setHours(23, 59, 59, 999);
-  return { start: monday.toISOString().slice(0, 10), end: sunday.toISOString().slice(0, 10) };
-}
-
-const STATUS_META = {
-  pending:  { label: "AGUARDANDO", color: "#FFC300", icon: "clock" },
-  approved: { label: "APROVADA",  color: "#2DBA72", icon: "check-circle" },
-  rejected: { label: "REJEITADA", color: "#E04A3D", icon: "alert" },
-};
-
-function SaleStatusChip({ status }) {
-  const m = STATUS_META[status] || STATUS_META.pending;
-  return <Chip icon={m.icon} color={m.color} bg={`${m.color}1A`}>{m.label}</Chip>;
-}
-
-function MarkSaleModal({ onClose, onSave, defaultAttendant, attendants, isAdmin }) {
-  const [value, setValue] = useState("");
-  const [note, setNote] = useState("");
-  const [attendantId, setAttendantId] = useState(defaultAttendant?.id || "");
-  const [splitFifty, setSplitFifty] = useState(false);
-  const [secondAttendantId, setSecondAttendantId] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const submit = async () => {
-    const v = Number(value);
-    if (!v || v <= 0) return alert("Informe um valor válido");
-    if (!attendantId) return alert("Selecione o atendente");
-    if (splitFifty && (!secondAttendantId || secondAttendantId === attendantId)) return alert("Selecione um segundo atendente diferente");
-    const now = new Date();
-    const date = now.toISOString().slice(0, 10);
-    const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    const ts = now.getTime();
-    const a1 = attendants.find(a => a.id === attendantId);
-    setSaving(true);
-    try {
-      if (splitFifty) {
-        const a2 = attendants.find(a => a.id === secondAttendantId);
-        const half = Math.round((v / 2) * 100) / 100;
-        await onSave({ id: uid(), attendantId, attendantName: a1?.name || "", value: half, note: note ? `${note} (50/50)` : "Dividida 50/50", date, time, timestamp: ts });
-        await onSave({ id: uid(), attendantId: secondAttendantId, attendantName: a2?.name || "", value: half, note: note ? `${note} (50/50)` : "Dividida 50/50", date, time, timestamp: ts + 1 });
-      } else {
-        await onSave({ id: uid(), attendantId, attendantName: a1?.name || "", value: v, note, date, time, timestamp: ts });
-      }
-      onClose();
-    } catch (err) {
-      alert("Falha ao salvar venda. Tente novamente.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const inputStyle = {
-    width: "100%", background: K.surface2, border: `1px solid ${K.border}`,
-    borderRadius: 10, padding: "12px 14px", color: K.text,
-    fontFamily: FONT, fontSize: 16, outline: "none",
-  };
-
-  return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.78)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, fontFamily: FONT }} className="kuali-anim">
-      <div onClick={e => e.stopPropagation()} style={{ background: K.surface, borderRadius: 16, border: `1px solid ${K.border}`, padding: 22, width: "100%", maxWidth: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-          <div>
-            <div style={{ ...T.caption, color: K.muted }}>NOVA VENDA</div>
-            <div style={{ ...T.h2, color: K.text, marginTop: 2 }}>Marcar comanda</div>
-          </div>
-          <button onClick={onClose} aria-label="Fechar" style={{ width: 36, height: 36, borderRadius: 10, background: K.surface2, border: `1px solid ${K.border}`, color: K.text2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Icon name="x" size={18} />
-          </button>
-        </div>
-
-        {isAdmin && attendants.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Atendente</label>
-            <select value={attendantId} onChange={e => setAttendantId(e.target.value)} style={inputStyle}>
-              <option value="">— Selecione —</option>
-              {attendants.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
-          </div>
-        )}
-
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Valor da venda (R$)</label>
-          <input type="number" inputMode="decimal" step="0.01" value={value} onChange={e => setValue(e.target.value)} placeholder="0,00"
-            autoFocus
-            onFocus={e => { e.currentTarget.style.borderColor = K.orange; }}
-            onBlur={e => { e.currentTarget.style.borderColor = K.border; }}
-            style={{ ...inputStyle, fontFamily: MONO, fontSize: 22, fontWeight: 700 }} />
-        </div>
-
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Mesa / observação (opcional)</label>
-          <input value={note} onChange={e => setNote(e.target.value)} placeholder="Ex: Mesa 7"
-            onFocus={e => { e.currentTarget.style.borderColor = K.orange; }}
-            onBlur={e => { e.currentTarget.style.borderColor = K.border; }}
-            style={inputStyle} />
-        </div>
-
-        {attendants.length > 1 && (
-          <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: splitFifty ? `${K.orange}1A` : K.surface2, border: `1px solid ${splitFifty ? `${K.orange}55` : K.border}`, borderRadius: 10, cursor: "pointer", marginBottom: 14, transition: "all 150ms ease" }}>
-            <div style={{ width: 18, height: 18, borderRadius: 5, background: splitFifty ? K.orange : "transparent", border: `2px solid ${splitFifty ? K.orange : K.borderStrong}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {splitFifty && <Icon name="check-bold" size={11} color={K.black} />}
-            </div>
-            <input type="checkbox" checked={splitFifty} onChange={e => setSplitFifty(e.target.checked)} style={{ display: "none" }} />
-            <span style={{ ...T.bodyB, color: splitFifty ? K.orange : K.text2, fontSize: 13 }}>Dividir 50/50 com outro atendente</span>
-          </label>
-        )}
-
-        {splitFifty && (
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>Segundo atendente</label>
-            <select value={secondAttendantId} onChange={e => setSecondAttendantId(e.target.value)} style={inputStyle}>
-              <option value="">— Selecione —</option>
-              {attendants.filter(a => a.id !== attendantId).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
-          </div>
-        )}
-
-        <Btn kind="primary" size="lg" full icon={saving ? undefined : "check-bold"} loading={saving} onClick={submit}>
-          {saving ? "Salvando…" : "Marcar venda"}
-        </Btn>
-      </div>
-    </div>
-  );
-}
-
-function SaleRow({ sale, onApprove, onReject, onEdit, onDelete, canEdit, canApprove }) {
-  const [showReject, setShowReject] = useState(false);
-  const [reason, setReason] = useState("");
-  return (
-    <div style={{ background: K.surface, border: `1px solid ${K.border}`, borderRadius: 12, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <div style={{ flex: "1 1 160px", minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <span style={{ ...T.mono, fontSize: 18, fontWeight: 700, color: K.text }}>R$ {Number(sale.value).toFixed(2).replace(".", ",")}</span>
-            <SaleStatusChip status={sale.status} />
-          </div>
-          <div style={{ ...T.small, color: K.muted, marginTop: 4 }}>
-            {sale.attendantName} · {sale.date.split("-").reverse().join("/")} <span style={T.mono}>{sale.time}</span>
-            {sale.note && <> · {sale.note}</>}
-          </div>
-          {sale.status === "rejected" && sale.rejectionReason && (
-            <div style={{ ...T.small, color: K.err, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
-              <Icon name="alert" size={12} /> {sale.rejectionReason}
-            </div>
-          )}
-        </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          {canApprove && sale.status === "pending" && (
-            <>
-              <Btn kind="success" size="sm" icon="check" onClick={() => onApprove(sale.id)}>Aprovar</Btn>
-              <Btn kind="ghost" size="sm" icon="x" onClick={() => setShowReject(s => !s)} style={{ color: K.err }}>Rejeitar</Btn>
-            </>
-          )}
-          {canEdit && sale.status === "pending" && (
-            <button onClick={() => onDelete(sale.id)} title="Apagar"
-              style={{ background: "transparent", border: "none", cursor: "pointer", color: K.muted, padding: 6, display: "flex" }}
-              onMouseEnter={e => e.currentTarget.style.color = K.err}
-              onMouseLeave={e => e.currentTarget.style.color = K.muted}>
-              <Icon name="trash" size={16} />
-            </button>
-          )}
-        </div>
-      </div>
-      {showReject && (
-        <div style={{ display: "flex", gap: 8, padding: 10, background: K.surface2, borderRadius: 10, border: `1px solid ${K.err}55` }}>
-          <input value={reason} onChange={e => setReason(e.target.value)} placeholder="Motivo (ex: comanda não bate com caixa)"
-            onKeyDown={e => { if (e.key === "Enter" && reason.trim()) { onReject(sale.id, reason.trim()); setShowReject(false); setReason(""); } }}
-            style={{ flex: 1, background: K.surface, border: `1px solid ${K.border}`, borderRadius: 8, padding: "8px 10px", color: K.text, fontFamily: FONT, fontSize: 13, outline: "none" }} />
-          <Btn kind="danger" size="sm" onClick={() => { if (!reason.trim()) return; onReject(sale.id, reason.trim()); setShowReject(false); setReason(""); }}>Confirmar</Btn>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SalesAttendantView({ sales, currentUser, onAdd, onUpdate, onRemove }) {
-  const [showModal, setShowModal] = useState(false);
-  const week = currentWeekRangeISO();
-  const mySales = sales.filter(s => s.attendantId === currentUser.id);
-  const inWeek = mySales.filter(s => s.date >= week.start && s.date <= week.end);
-  const total = inWeek.reduce((a, s) => a + Number(s.value), 0);
-  const approved = inWeek.filter(s => s.status === "approved").reduce((a, s) => a + Number(s.value), 0);
-  const pending = inWeek.filter(s => s.status === "pending").reduce((a, s) => a + Number(s.value), 0);
-  const rate = Number(currentUser.commissionRate) || 0;
-  const commission = (approved * rate) / 100;
-
-  return (
-    <div className="kuali-anim" style={{ padding: "20px 16px 100px", maxWidth: 720, margin: "0 auto", fontFamily: FONT }}>
-      {/* Resumo da semana */}
-      <Card padding={18} style={{ marginBottom: 18 }}>
-        <div style={{ ...T.caption, color: K.orange, marginBottom: 10 }}>SEMANA · {week.start.split("-").reverse().join("/")} → {week.end.split("-").reverse().join("/")}</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
-          <div>
-            <div style={{ ...T.caption, color: K.muted }}>APROVADAS</div>
-            <div style={{ ...T.mono, fontSize: 22, fontWeight: 700, color: K.green, marginTop: 4 }}>R$ {approved.toFixed(2).replace(".", ",")}</div>
-          </div>
-          <div>
-            <div style={{ ...T.caption, color: K.muted }}>AGUARDANDO</div>
-            <div style={{ ...T.mono, fontSize: 22, fontWeight: 700, color: K.yellow, marginTop: 4 }}>R$ {pending.toFixed(2).replace(".", ",")}</div>
-          </div>
-        </div>
-        <div style={{ padding: 14, background: `${K.orange}1A`, border: `1px solid ${K.orange}55`, borderRadius: 12 }}>
-          <div style={{ ...T.caption, color: K.orange }}>SUA COMISSÃO ({rate}%)</div>
-          <div style={{ ...T.mono, fontSize: 28, fontWeight: 700, color: K.orange, marginTop: 4 }}>R$ {commission.toFixed(2).replace(".", ",")}</div>
-        </div>
-      </Card>
-
-      <Btn kind="primary" size="xl" full icon="plus" onClick={() => setShowModal(true)} style={{ marginBottom: 18 }}>
-        Marcar nova venda
-      </Btn>
-
-      <div style={{ ...T.caption, color: K.muted, marginBottom: 10 }}>SUAS VENDAS DA SEMANA ({inWeek.length})</div>
-      {inWeek.length === 0 ? (
-        <Card padding={32} style={{ textAlign: "center" }}>
-          <div style={{ width: 48, height: 48, borderRadius: 14, background: K.surface2, color: K.muted, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
-            <Icon name="shopping" size={22} />
-          </div>
-          <div style={{ ...T.bodyB, color: K.text }}>Nenhuma venda nesta semana</div>
-          <div style={{ ...T.small, color: K.muted, marginTop: 4 }}>Toque em "Marcar nova venda" pra começar</div>
-        </Card>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {inWeek.map(s => <SaleRow key={s.id} sale={s} canEdit canApprove={false} onDelete={onRemove} />)}
-        </div>
-      )}
-
-      {showModal && (
-        <MarkSaleModal
-          onClose={() => setShowModal(false)}
-          onSave={onAdd}
-          defaultAttendant={currentUser}
-          attendants={[currentUser]}
-          isAdmin={false}
-        />
-      )}
-    </div>
-  );
-}
-
-function SalesAdminView({ sales, users, tab, onApprove, onReject, onAdd, onUpdate, onRemove, currentUser }) {
-  const [showModal, setShowModal] = useState(false);
-  const [filterAttendant, setFilterAttendant] = useState("all");
-  const week = currentWeekRangeISO();
-  const attendants = users.filter(u => u.isCommissioned);
-  const pending = sales.filter(s => s.status === "pending");
-
-  const inputStyle = {
-    background: K.surface2, border: `1px solid ${K.border}`, borderRadius: 10,
-    padding: "8px 12px", color: K.text, fontFamily: FONT, fontSize: 14, outline: "none",
-  };
-
-  // ── Aprovar ──
-  if (tab === "aprovar") {
-    return (
-      <div className="kuali-anim" style={{ padding: "20px 16px 32px", maxWidth: 880, margin: "0 auto", fontFamily: FONT }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
-          <div>
-            <div style={{ ...T.caption, color: K.orange }}>VENDAS</div>
-            <div style={{ ...T.h1, color: K.text, marginTop: 6, fontSize: 24 }}>A aprovar</div>
-            <div style={{ ...T.body, color: K.text2, marginTop: 4, fontSize: 14 }}>{pending.length} {pending.length === 1 ? "comanda aguardando" : "comandas aguardando"} aprovação</div>
-          </div>
-          <Btn kind="primary" icon="plus" onClick={() => setShowModal(true)}>Marcar venda</Btn>
-        </div>
-
-        {pending.length === 0 ? (
-          <Card padding={40} style={{ textAlign: "center" }}>
-            <div style={{ width: 56, height: 56, borderRadius: 16, background: `${K.green}1A`, color: K.green, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
-              <Icon name="check-circle" size={28} />
-            </div>
-            <div style={{ ...T.bodyB, color: K.text }}>Nada pendente</div>
-            <div style={{ ...T.small, color: K.muted, marginTop: 4 }}>Todas as comandas foram revisadas.</div>
-          </Card>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {pending.map(s => (
-              <SaleRow key={s.id} sale={s} canApprove canEdit={false} onApprove={onApprove} onReject={onReject} />
-            ))}
-          </div>
-        )}
-
-        {showModal && (
-          <MarkSaleModal
-            onClose={() => setShowModal(false)}
-            onSave={onAdd}
-            defaultAttendant={attendants[0]}
-            attendants={attendants}
-            isAdmin
-          />
-        )}
-      </div>
-    );
-  }
-
-  // ── Resumo da semana ──
-  if (tab === "resumo") {
-    const inWeek = sales.filter(s => s.date >= week.start && s.date <= week.end);
-    const closePeriod = async () => {
-      if (!confirm(`Fechar a semana ${week.start.split("-").reverse().join("/")} → ${week.end.split("-").reverse().join("/")}?\n\nIsso gera o snapshot final dos totais. Continue?`)) return;
-      const snapshot = attendants.map(a => {
-        const mine = inWeek.filter(s => s.attendantId === a.id && s.status === "approved");
-        const total = mine.reduce((acc, s) => acc + Number(s.value), 0);
-        const rate = Number(a.commissionRate) || 0;
-        return { attendantId: a.id, attendantName: a.name, totalApproved: total, rate, commission: (total * rate) / 100 };
-      });
-      try {
-        await fetch("/api/commission/close-period", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ closedBy: currentUser.id, snapshot }),
-        });
-        alert("Semana fechada com sucesso. Snapshot salvo no histórico.");
-      } catch {
-        alert("Falha ao fechar — tente novamente.");
-      }
-    };
-
-    return (
-      <div className="kuali-anim" style={{ padding: "20px 16px 32px", maxWidth: 880, margin: "0 auto", fontFamily: FONT }}>
-        <div style={{ marginBottom: 18 }}>
-          <div style={{ ...T.caption, color: K.orange }}>RESUMO DA SEMANA</div>
-          <div style={{ ...T.h1, color: K.text, marginTop: 6, fontSize: 24 }}>{week.start.split("-").reverse().join("/")} → {week.end.split("-").reverse().join("/")}</div>
-        </div>
-
-        {attendants.length === 0 ? (
-          <Card padding={32} style={{ textAlign: "center" }}>
-            <div style={{ ...T.bodyB, color: K.text }}>Nenhum atendente comissionado</div>
-            <div style={{ ...T.small, color: K.muted, marginTop: 4 }}>Marque "Atendente comissionado" no perfil de quem vai receber em "Equipe".</div>
-          </Card>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12, marginBottom: 18 }}>
-            {attendants.map(a => {
-              const mine = inWeek.filter(s => s.attendantId === a.id);
-              const approved = mine.filter(s => s.status === "approved").reduce((acc, s) => acc + Number(s.value), 0);
-              const pending = mine.filter(s => s.status === "pending").reduce((acc, s) => acc + Number(s.value), 0);
-              const rate = Number(a.commissionRate) || 0;
-              const commission = (approved * rate) / 100;
-              return (
-                <Card key={a.id} padding={18}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: `${K.orange}22`, color: K.orange, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT, fontSize: 14, fontWeight: 800 }}>
-                      {a.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ ...T.bodyB, color: K.text }}>{a.name}</div>
-                      <div style={{ ...T.small, color: K.muted, marginTop: 2 }}>{rate}% sobre vendas aprovadas</div>
-                    </div>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-                    <div>
-                      <div style={{ ...T.caption, color: K.muted }}>APROVADAS</div>
-                      <div style={{ ...T.mono, fontSize: 16, fontWeight: 700, color: K.text, marginTop: 4 }}>R$ {approved.toFixed(2).replace(".", ",")}</div>
-                    </div>
-                    <div>
-                      <div style={{ ...T.caption, color: K.muted }}>PENDENTES</div>
-                      <div style={{ ...T.mono, fontSize: 16, fontWeight: 700, color: K.yellow, marginTop: 4 }}>R$ {pending.toFixed(2).replace(".", ",")}</div>
-                    </div>
-                  </div>
-                  <div style={{ padding: 12, background: `${K.orange}1A`, border: `1px solid ${K.orange}55`, borderRadius: 10 }}>
-                    <div style={{ ...T.caption, color: K.orange }}>COMISSÃO A PAGAR</div>
-                    <div style={{ ...T.mono, fontSize: 22, fontWeight: 700, color: K.orange, marginTop: 4 }}>R$ {commission.toFixed(2).replace(".", ",")}</div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-
-        {attendants.length > 0 && (
-          <Btn kind="secondary" icon="check-bold" onClick={closePeriod}>
-            Fechar semana e gerar snapshot
-          </Btn>
-        )}
-      </div>
-    );
-  }
-
-  // ── Histórico ──
-  const filtered = filterAttendant === "all" ? sales : sales.filter(s => s.attendantId === filterAttendant);
-  return (
-    <div className="kuali-anim" style={{ padding: "20px 16px 32px", maxWidth: 880, margin: "0 auto", fontFamily: FONT }}>
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ ...T.caption, color: K.orange }}>HISTÓRICO</div>
-        <div style={{ ...T.h1, color: K.text, marginTop: 6, fontSize: 24 }}>Todas as vendas</div>
-        <div style={{ ...T.body, color: K.text2, marginTop: 4, fontSize: 14 }}>{filtered.length} comandas</div>
-      </div>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
-        <span style={{ ...T.caption, color: K.muted }}>ATENDENTE</span>
-        <button onClick={() => setFilterAttendant("all")} style={{ ...inputStyle, padding: "6px 12px", borderRadius: 9999, background: filterAttendant === "all" ? `${K.orange}1A` : "transparent", color: filterAttendant === "all" ? K.orange : K.text2, borderColor: filterAttendant === "all" ? K.orange : K.border, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
-          Todos
-        </button>
-        {attendants.map(a => (
-          <button key={a.id} onClick={() => setFilterAttendant(a.id)} style={{ ...inputStyle, padding: "6px 12px", borderRadius: 9999, background: filterAttendant === a.id ? `${K.orange}1A` : "transparent", color: filterAttendant === a.id ? K.orange : K.text2, borderColor: filterAttendant === a.id ? K.orange : K.border, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
-            {a.name}
-          </button>
-        ))}
-      </div>
-
-      {filtered.length === 0 ? (
-        <Card padding={32} style={{ textAlign: "center" }}>
-          <div style={{ ...T.bodyB, color: K.text }}>Nenhuma venda registrada</div>
-        </Card>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {filtered.map(s => (
-            <SaleRow key={s.id} sale={s} canApprove={s.status === "pending"} canEdit={s.status === "pending"}
-              onApprove={onApprove} onReject={onReject} onDelete={onRemove} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function EmployeeManager({ users, onAdd, onUpdate, onRemove }) {
-  const empty = { name: "", username: "", password: "", role: ROLES[0], isAdmin: false, isCommissioned: false, commissionRate: 0 };
+  const empty = { name: "", username: "", password: "", role: ROLES[0], isAdmin: false };
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
 
@@ -871,7 +447,7 @@ function EmployeeManager({ users, onAdd, onUpdate, onRemove }) {
     setForm(empty);
   };
 
-  const startEdit = (u) => { setEditId(u.id); setForm({ name: u.name, username: u.username, password: u.password, role: u.role, isAdmin: u.isAdmin, isCommissioned: !!u.isCommissioned, commissionRate: Number(u.commissionRate) || 0 }); };
+  const startEdit = (u) => { setEditId(u.id); setForm({ name: u.name, username: u.username, password: u.password, role: u.role, isAdmin: u.isAdmin }); };
   const cancelEdit = () => { setEditId(null); setForm(empty); };
   const remove = (id) => { if (id === "admin") return alert("Não pode remover o admin principal"); onRemove(id); };
 
@@ -919,36 +495,13 @@ function EmployeeManager({ users, onAdd, onUpdate, onRemove }) {
             </select>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "8px 12px", background: form.isAdmin ? `${K.orange}1A` : K.surface2, border: `1px solid ${form.isAdmin ? `${K.orange}55` : K.border}`, borderRadius: 10, transition: "all 150ms ease" }}>
-            <div style={{ width: 20, height: 20, borderRadius: 6, background: form.isAdmin ? K.orange : "transparent", border: `2px solid ${form.isAdmin ? K.orange : K.borderStrong}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {form.isAdmin && <Icon name="check-bold" size={12} color={K.black} />}
-            </div>
-            <input type="checkbox" checked={form.isAdmin} onChange={e => setForm({ ...form, isAdmin: e.target.checked })} style={{ display: "none" }} />
-            <span style={{ ...T.bodyB, color: form.isAdmin ? K.orange : K.text2, fontSize: 13 }}>Acesso admin</span>
-          </label>
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "8px 12px", background: form.isCommissioned ? `${K.orange}1A` : K.surface2, border: `1px solid ${form.isCommissioned ? `${K.orange}55` : K.border}`, borderRadius: 10, transition: "all 150ms ease" }}>
-            <div style={{ width: 20, height: 20, borderRadius: 6, background: form.isCommissioned ? K.orange : "transparent", border: `2px solid ${form.isCommissioned ? K.orange : K.borderStrong}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {form.isCommissioned && <Icon name="check-bold" size={12} color={K.black} />}
-            </div>
-            <input type="checkbox" checked={form.isCommissioned} onChange={e => setForm({ ...form, isCommissioned: e.target.checked })} style={{ display: "none" }} />
-            <span style={{ ...T.bodyB, color: form.isCommissioned ? K.orange : K.text2, fontSize: 13 }}>Atendente comissionado</span>
-          </label>
-        </div>
-        {form.isCommissioned && (
-          <div style={{ marginBottom: 14, maxWidth: 220 }}>
-            <label style={{ ...T.caption, color: K.text2, display: "block", marginBottom: 6 }}>% de comissão</label>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input type="number" step="0.1" min="0" max="100" value={form.commissionRate}
-                onChange={e => setForm({ ...form, commissionRate: e.target.value })}
-                onFocus={e => { e.currentTarget.style.borderColor = K.orange; }}
-                onBlur={e => { e.currentTarget.style.borderColor = K.border; }}
-                placeholder="5"
-                style={{ ...inputStyle, fontFamily: MONO, fontSize: 16, fontWeight: 700, width: 100, textAlign: "right" }} />
-              <span style={{ ...T.body, color: K.text2 }}>%</span>
-            </div>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 14, padding: "8px 12px", background: form.isAdmin ? `${K.orange}1A` : K.surface2, border: `1px solid ${form.isAdmin ? `${K.orange}55` : K.border}`, borderRadius: 10, transition: "all 150ms ease" }}>
+          <div style={{ width: 20, height: 20, borderRadius: 6, background: form.isAdmin ? K.orange : "transparent", border: `2px solid ${form.isAdmin ? K.orange : K.borderStrong}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {form.isAdmin && <Icon name="check-bold" size={12} color={K.black} />}
           </div>
-        )}
+          <input type="checkbox" checked={form.isAdmin} onChange={e => setForm({ ...form, isAdmin: e.target.checked })} style={{ display: "none" }} />
+          <span style={{ ...T.bodyB, color: form.isAdmin ? K.orange : K.text2, fontSize: 13 }}>Acesso admin</span>
+        </label>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <Btn kind="primary" icon={editId ? "check" : "plus"} onClick={save}>{editId ? "Salvar alterações" : "Adicionar funcionário"}</Btn>
           {editId && <Btn kind="secondary" icon="x" onClick={cancelEdit}>Cancelar</Btn>}
@@ -972,7 +525,6 @@ function EmployeeManager({ users, onAdd, onUpdate, onRemove }) {
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span style={{ ...T.bodyB, color: K.text }}>{u.name}</span>
                 {u.isAdmin && <Chip color={K.orange} bg={`${K.orange}1A`}>admin</Chip>}
-                {u.isCommissioned && <Chip icon="shopping" color={K.green} bg={`${K.green}1A`}>{Number(u.commissionRate).toFixed(1)}%</Chip>}
               </div>
               <div style={{ ...T.small, color: K.muted, marginTop: 2 }}>
                 <span style={{ ...T.mono }}>@{u.username}</span> · {u.role}
@@ -1290,7 +842,19 @@ function ChecklistCreate({ templates, onAdd, onUpdate, onRemove }) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoClick }) {
-  const [activeId, setActiveId] = useState(null);
+  // ACTIVE ID persistido em localStorage. Crítico no iPhone: se o Safari
+  // matar a página enquanto a câmera está aberta, o user retorna pra mesma
+  // tela em vez de cair na home do checklist (e perder o rascunho mid-flow).
+  const [activeId, setActiveId] = useState(() => {
+    try { return localStorage.getItem("kuali_active_checklist") || null; } catch { return null; }
+  });
+  useEffect(() => {
+    try {
+      if (activeId) localStorage.setItem("kuali_active_checklist", activeId);
+      else localStorage.removeItem("kuali_active_checklist");
+    } catch { }
+  }, [activeId]);
+
   const [checked, setChecked] = useState({});
   const [photos, setPhotos] = useState({});
   const [saving, setSaving] = useState(false);
@@ -1298,6 +862,16 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
   const [photoLoading, setPhotoLoading] = useState(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [pendingCount, setPendingCount] = useState(0);
+
+  // Input de arquivo PERSISTENTE em JSX (ref'd por React). Crítico no iPhone:
+  // - inputs criados via document.createElement e .removeChild dão chance pro
+  //   GC do iOS reciclar enquanto a câmera está aberta, e o onchange morre
+  // - input renderizado por React e mantido no DOM sobrevive ao reload
+  // - guardamos qual item alvo num ref pra saber onde a foto vai cair quando
+  //   onchange disparar (mesmo que o React tenha re-renderizado entre o click
+  //   e o callback)
+  const fileInputRef = useRef(null);
+  const photoTargetRef = useRef(null);
 
   // Indicador de fila pendente / online no header da tarefa
   useEffect(() => {
@@ -1377,84 +951,86 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
     // checked/photos são restaurados pelo useEffect acima
   };
 
-  // Compressor robusto: timeout pra não travar em iOS quando o decode falha
-  // silenciosamente, e detecção mais forte de erro de carregamento.
-  const compressImage = (file, maxW = 1024, quality = 0.65) => new Promise((resolve, reject) => {
-    const TIMEOUT_MS = 20000;
+  // Compressor agressivo: 800×, qualidade 0.55. Em testes reais isso fica
+  // tipicamente em 50–120KB por foto (vs 200–400KB do 1024/0.65), o que
+  // reduz drasticamente a pressão de memória durante o draw no canvas — a
+  // principal causa do iOS evict a página inteira.
+  // Para fotos muito grandes (>4000px), faz downsample em duas etapas pra
+  // evitar o limite de tamanho de canvas do iOS (≈16Mpx no iPhone 8/X).
+  const compressImage = (file, maxW = 800, quality = 0.55) => new Promise((resolve, reject) => {
+    const TIMEOUT_MS = 25000;
     let settled = false;
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      reject(new Error("Tempo esgotado lendo a foto"));
-    }, TIMEOUT_MS);
-    const settle = (fn) => (...args) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      fn(...args);
-    };
+    const timer = setTimeout(() => { if (!settled) { settled = true; reject(new Error("Tempo esgotado")); } }, TIMEOUT_MS);
+    const finishOk = (v) => { if (!settled) { settled = true; clearTimeout(timer); resolve(v); } };
+    const finishErr = (e) => { if (!settled) { settled = true; clearTimeout(timer); reject(e); } };
+
     const reader = new FileReader();
     reader.onload = ev => {
       const img = new Image();
-      img.onload = settle(() => {
+      img.onload = () => {
         try {
-          const scale = Math.min(1, maxW / img.width);
-          const w = Math.round(img.width * scale);
-          const h = Math.round(img.height * scale);
+          // Downsample em 2 etapas se > 2× alvo (qualidade melhor que 1 etapa)
+          let srcW = img.width, srcH = img.height;
+          let source = img;
+          if (srcW > maxW * 2) {
+            const midW = Math.round(srcW / 2);
+            const midH = Math.round(srcH / 2);
+            const mid = document.createElement("canvas");
+            mid.width = midW; mid.height = midH;
+            mid.getContext("2d").drawImage(img, 0, 0, midW, midH);
+            source = mid; srcW = midW; srcH = midH;
+          }
+          const scale = Math.min(1, maxW / srcW);
+          const w = Math.round(srcW * scale);
+          const h = Math.round(srcH * scale);
           const canvas = document.createElement("canvas");
           canvas.width = w; canvas.height = h;
-          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL("image/jpeg", quality));
-        } catch (err) { reject(err); }
-      });
-      img.onerror = settle(() => reject(new Error("Não consegui decodificar a imagem (formato pode ser HEIC)")));
+          canvas.getContext("2d").drawImage(source, 0, 0, w, h);
+          finishOk(canvas.toDataURL("image/jpeg", quality));
+        } catch (err) { finishErr(err); }
+      };
+      img.onerror = () => finishErr(new Error("Decode falhou (HEIC?)"));
       img.src = ev.target.result;
     };
-    reader.onerror = settle(() => reject(new Error("FileReader falhou")));
-    reader.onabort = settle(() => reject(new Error("Leitura abortada")));
+    reader.onerror = () => finishErr(new Error("FileReader falhou"));
     reader.readAsDataURL(file);
   });
 
-  // iPhone fix: cria input invisível dentro do <body> em vez de detached node.
-  // Em alguns iOS Safari, inputs detached não disparam onchange ou cancelam
-  // antes da imagem ser lida. Apêndice + cleanup garantido + feedback visual.
+  // Click no botão "Tirar foto": só guarda o item alvo num ref + reseta o
+  // value do input + dispara click. O onChange real está no JSX do input.
   const handlePhoto = (itemIdx) => {
-    if (photoLoading !== null) return; // não permite duas leituras simultâneas
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.capture = "environment";
-    input.style.position = "fixed";
-    input.style.top = "-9999px";
-    input.style.left = "-9999px";
-    input.style.opacity = "0";
-    document.body.appendChild(input);
-    const cleanup = () => {
-      try { if (input.parentNode) input.parentNode.removeChild(input); } catch { }
-    };
-    input.onchange = async e => {
-      const file = e.target.files?.[0];
-      if (!file) { cleanup(); return; }
-      setPhotoLoading(itemIdx);
-      try {
-        const dataUrl = await compressImage(file);
-        setPhotos(prev => ({ ...prev, [itemIdx]: [...(prev[itemIdx] || []), dataUrl] }));
-      } catch (err) {
-        console.error("Erro processando foto:", err);
-        alert("Não consegui processar essa foto.\n\n• Tente tirar de novo (às vezes o iPhone falha)\n• Se persistir, escolha uma da galeria");
-      } finally {
-        setPhotoLoading(null);
-        cleanup();
-      }
-    };
-    // Safari iOS às vezes só dispara após focus → usamos requestAnimationFrame
-    requestAnimationFrame(() => {
-      try { input.click(); } catch { cleanup(); }
-    });
-    // Fallback de cleanup se o usuário cancelar (não dispara onchange)
-    setTimeout(() => {
-      if (input.parentNode && !input.files?.length) cleanup();
-    }, 60000);
+    if (photoLoading !== null) return;
+    photoTargetRef.current = itemIdx;
+    const input = fileInputRef.current;
+    if (!input) return;
+    // CRÍTICO: reseta value pra garantir que onChange dispara mesmo se o user
+    // tirar duas fotos seguidas (mesmo "nome" → mesmo File.name → iOS pode
+    // suprimir o evento sem reset).
+    input.value = "";
+    input.click();
+  };
+
+  // Handler conectado ao input renderizado em JSX. Sobrevive a re-renders,
+  // não é GC'd enquanto câmera tá aberta, e funciona após Safari reload
+  // porque é parte do componente persistente.
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    const itemIdx = photoTargetRef.current;
+    photoTargetRef.current = null;
+    // Reset imediato — libera memória do File e garante próximo click funcione
+    try { e.target.value = ""; } catch { }
+    if (!file || itemIdx === null || itemIdx === undefined) return;
+
+    setPhotoLoading(itemIdx);
+    try {
+      const dataUrl = await compressImage(file);
+      setPhotos(prev => ({ ...prev, [itemIdx]: [...(prev[itemIdx] || []), dataUrl] }));
+    } catch (err) {
+      console.error("Foto falhou:", err);
+      alert("Não consegui processar essa foto.\n\n• Tente tirar de novo (no iPhone às vezes precisa)\n• Ou escolha da galeria em vez de tirar agora");
+    } finally {
+      setPhotoLoading(null);
+    }
   };
 
   const removePhoto = (itemIdx, photoIdx) => {
@@ -1516,6 +1092,17 @@ function ChecklistDo({ templates, completions, onComplete, currentUser, onPhotoC
 
     return (
       <div className="kuali-anim" style={{ background: K.ink, minHeight: "100vh", color: K.text, fontFamily: FONT, paddingBottom: 140 }}>
+        {/* Input de arquivo persistente — fica no JSX o tempo todo na tela ativa.
+            Importante NÃO recriar a cada render: fileInputRef garante isso. */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileChange}
+          style={{ position: "fixed", left: -9999, top: -9999, width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
+        />
+
         {/* Header sticky */}
         <div style={{ position: "sticky", top: 0, zIndex: 5, padding: "12px 16px 14px", borderBottom: `1px solid ${K.border}`, background: K.ink, maxWidth: 600, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
@@ -2337,10 +1924,6 @@ export default function App() {
   const [reminders, setReminders] = useState([]);
   const [showReminders, setShowReminders] = useState(false);
 
-  // Sales / Commission
-  const [sales, setSales] = useState([]);
-  const [vendasTab, setVendasTab] = useState("aprovar");
-
   // handleDrop hook before early return
   const handleDrop = useCallback(e => { e.preventDefault(); setDragOver(false); }, []);
 
@@ -2452,10 +2035,21 @@ export default function App() {
     }).catch(() => { });
   }, [mergePending]);
 
+  // Polling pausável: só roda quando o app está visível (otimização pra iPhone
+  // — economiza bateria, dados móveis, e evita queries desnecessárias no
+  // Supabase quando ninguém tá olhando).
   useEffect(() => {
     if (!currentUser) return;
-    const interval = setInterval(refreshChecklists, 30000);
-    return () => clearInterval(interval);
+    let interval = null;
+    const start = () => {
+      if (interval) return;
+      interval = setInterval(refreshChecklists, 30000);
+    };
+    const stop = () => { if (interval) { clearInterval(interval); interval = null; } };
+    const onVis = () => { document.visibilityState === "visible" ? start() : stop(); };
+    if (document.visibilityState === "visible") start();
+    document.addEventListener("visibilitychange", onVis);
+    return () => { document.removeEventListener("visibilitychange", onVis); stop(); };
   }, [currentUser, refreshChecklists]);
 
   // Refetch checklists whenever user navigates to the checklists section or switches sub-tabs
@@ -2476,8 +2070,13 @@ export default function App() {
   useEffect(() => {
     if (!currentUser || section !== "producao") return;
     refreshProduction();
-    const t = setInterval(refreshProduction, 15000);
-    return () => clearInterval(t);
+    let t = null;
+    const start = () => { if (!t) t = setInterval(refreshProduction, 15000); };
+    const stop = () => { if (t) { clearInterval(t); t = null; } };
+    const onVis = () => { document.visibilityState === "visible" ? start() : stop(); };
+    if (document.visibilityState === "visible") start();
+    document.addEventListener("visibilitychange", onVis);
+    return () => { document.removeEventListener("visibilitychange", onVis); stop(); };
   }, [currentUser, section, refreshProduction]);
 
   // Refetch users ao entrar na aba "funcionarios" — defesa caso bootstrap
@@ -2489,19 +2088,6 @@ export default function App() {
       if (Array.isArray(data)) setUsers(data);
     }).catch(() => { });
   }, [currentUser, section]);
-
-  // ── Sales: carrega ao entrar na aba e faz polling enquanto está na tela ──
-  const refreshSales = useCallback(() => {
-    fetch("/api/sales").then(r => r.json()).then(data => {
-      if (Array.isArray(data)) setSales(data);
-    }).catch(() => { });
-  }, []);
-  useEffect(() => {
-    if (!currentUser || section !== "vendas") return;
-    refreshSales();
-    const t = setInterval(refreshSales, 20000);
-    return () => clearInterval(t);
-  }, [currentUser, section, refreshSales]);
 
   // Detecta mobile pra colapsar elementos do header (texto do usuário, label "Sair").
   // IMPORTANTE: precisa estar ANTES do early-return — caso contrário o número de
@@ -2607,36 +2193,6 @@ export default function App() {
     const next = { ...prodCycle, ...patch };
     setProdCycle(next);
     await api("/api/production/cycle", { method: "PUT", body: JSON.stringify(next) });
-  };
-
-  // ── Sales / Commission ──
-  const addSale = async (sale) => {
-    setSales(prev => [sale, ...prev]); // optimistic
-    try {
-      await apiReliable("/api/sales", { method: "POST", body: JSON.stringify(sale) });
-    } catch (err) {
-      // Rollback otimista
-      setSales(prev => prev.filter(s => s.id !== sale.id));
-      throw err;
-    }
-  };
-  const updateSale = (id, patch) => {
-    setSales(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s));
-    api(`/api/sales/${id}`, { method: "PUT", body: JSON.stringify(patch) });
-  };
-  const removeSale = (id) => {
-    setSales(prev => prev.filter(s => s.id !== id));
-    api(`/api/sales/${id}`, { method: "DELETE" });
-  };
-  const approveSale = (id) => {
-    const now = new Date().toISOString();
-    setSales(prev => prev.map(s => s.id === id ? { ...s, status: "approved", approvedBy: currentUser.id, approvedAt: now, rejectionReason: null } : s));
-    api(`/api/sales/${id}/approve`, { method: "PUT", body: JSON.stringify({ approvedBy: currentUser.id }) });
-  };
-  const rejectSale = (id, reason) => {
-    const now = new Date().toISOString();
-    setSales(prev => prev.map(s => s.id === id ? { ...s, status: "rejected", approvedBy: currentUser.id, approvedAt: now, rejectionReason: reason } : s));
-    api(`/api/sales/${id}/reject`, { method: "PUT", body: JSON.stringify({ rejectedBy: currentUser.id, reason }) });
   };
 
   // Reminders
@@ -2784,17 +2340,6 @@ export default function App() {
             {isAdmin && <button onClick={() => setSection("compras")} style={mainTab(section === "compras")}><Icon name="receipt" size={15} color={section === "compras" ? K.orange : K.muted} /> Compras</button>}
             <button onClick={() => setSection("checklists")} style={mainTab(section === "checklists")}><Icon name="list" size={15} color={section === "checklists" ? K.orange : K.muted} /> Checklists</button>
             <button onClick={() => setSection("producao")} style={mainTab(section === "producao")}><Icon name="box" size={15} color={section === "producao" ? K.orange : K.muted} /> Produção</button>
-            {(isAdmin || currentUser.isCommissioned) && (
-              <button onClick={() => setSection("vendas")} style={mainTab(section === "vendas")}>
-                <Icon name="shopping" size={15} color={section === "vendas" ? K.orange : K.muted} />
-                Vendas
-                {isAdmin && sales.filter(s => s.status === "pending").length > 0 && (
-                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: K.orange, color: K.black, fontSize: 10, fontWeight: 800, marginLeft: 4 }}>
-                    {sales.filter(s => s.status === "pending").length}
-                  </span>
-                )}
-              </button>
-            )}
             <button onClick={() => setSection("funcionarios")} style={mainTab(section === "funcionarios")}><Icon name="user" size={15} color={section === "funcionarios" ? K.orange : K.muted} /> Equipe</button>
           </div>
         </div>
@@ -2828,15 +2373,6 @@ export default function App() {
             <button onClick={() => setCheckTab("fazer")} style={subTab(checkTab === "fazer")}>Check-lists</button>
             {isAdmin && <button onClick={() => setCheckTab("analise")} style={subTab(checkTab === "analise")}>Análise</button>}
             {isAdmin && <button onClick={() => setCheckTab("criar")} style={subTab(checkTab === "criar")}>Criar ({clTemplates.length})</button>}
-          </>
-        )}
-        {section === "vendas" && isAdmin && (
-          <>
-            <button onClick={() => setVendasTab("aprovar")} style={subTab(vendasTab === "aprovar")}>
-              A aprovar {sales.filter(s => s.status === "pending").length > 0 && <span style={{ ...T.mono, color: K.orange, marginLeft: 4 }}>({sales.filter(s => s.status === "pending").length})</span>}
-            </button>
-            <button onClick={() => setVendasTab("resumo")} style={subTab(vendasTab === "resumo")}>Resumo da semana</button>
-            <button onClick={() => setVendasTab("historico")} style={subTab(vendasTab === "historico")}>Histórico</button>
           </>
         )}
       </div>
@@ -3225,20 +2761,6 @@ export default function App() {
       {section === "checklists" && !isAdmin && checkTab !== "fazer" && <RestrictedArea />}
 
       {!isAdmin && section === "compras" && <RestrictedArea />}
-
-      {/* TAB: VENDAS / COMISSÃO */}
-      {section === "vendas" && !isAdmin && currentUser.isCommissioned && (
-        <SalesAttendantView sales={sales} currentUser={currentUser} onAdd={addSale} onUpdate={updateSale} onRemove={removeSale} />
-      )}
-      {section === "vendas" && !isAdmin && !currentUser.isCommissioned && <RestrictedArea />}
-      {section === "vendas" && isAdmin && (
-        <SalesAdminView
-          sales={sales} users={users} tab={vendasTab}
-          onApprove={approveSale} onReject={rejectSale}
-          onAdd={addSale} onUpdate={updateSale} onRemove={removeSale}
-          currentUser={currentUser}
-        />
-      )}
 
       <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       {showReminders && <RemindersModal reminders={reminders} currentUser={currentUser} onAdd={addReminder} onRemove={removeReminder} onClose={() => setShowReminders(false)} />}
